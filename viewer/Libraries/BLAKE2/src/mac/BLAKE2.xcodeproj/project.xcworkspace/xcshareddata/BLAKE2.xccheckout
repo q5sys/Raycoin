@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>IDESourceControlProjectFavoriteDictionaryKey</key>
+	<false/>
+	<key>IDESourceControlProjectIdentifier</key>
+	<string>FA3C6A16-E8FE-49DA-B329-12486EEA8C0C</string>
+	<key>IDESourceControlProjectName</key>
+	<string>BLAKE2</string>
+	<key>IDESourceControlProjectOriginsDictionary</key>
+	<dict>
+		<key>D6505C9D6008B227ACEC2FA3BBAF65842DAC1177</key>
+		<string>github.com:Qarterd/BLAKE2.git</string>
+		<key>E27B62CDC93ED4548B6505B121BBBD2B2AC7FD89</key>
+		<string>ngplus.ca:/repo/Honeycomb.git</string>
+	</dict>
+	<key>IDESourceControlProjectPath</key>
+	<string>src/mac/BLAKE2/BLAKE2.xcodeproj</string>
+	<key>IDESourceControlProjectRelativeInstallPathDictionary</key>
+	<dict>
+		<key>D6505C9D6008B227ACEC2FA3BBAF65842DAC1177</key>
+		<string>../../../../..</string>
+		<key>E27B62CDC93ED4548B6505B121BBBD2B2AC7FD89</key>
+		<string>../../../../../..</string>
+	</dict>
+	<key>IDESourceControlProjectURL</key>
+	<string>github.com:Qarterd/BLAKE2.git</string>
+	<key>IDESourceControlProjectVersion</key>
+	<integer>111</integer>
+	<key>IDESourceControlProjectWCCIdentifier</key>
+	<string>D6505C9D6008B227ACEC2FA3BBAF65842DAC1177</string>
+	<key>IDESourceControlProjectWCConfigurations</key>
+	<array>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.git</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>E27B62CDC93ED4548B6505B121BBBD2B2AC7FD89</string>
+			<key>IDESourceControlWCCName</key>
+			<string></string>
+		</dict>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.git</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>D6505C9D6008B227ACEC2FA3BBAF65842DAC1177</string>
+			<key>IDESourceControlWCCName</key>
+			<string>blake2</string>
+		</dict>
+	</array>
+</dict>
+</plist>

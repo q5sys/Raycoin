@@ -58,28 +58,28 @@ enum jtokentype getJsonToken(std::string& tokenVal, unsigned int& consumed,
 
     case '{':
         raw++;
-        consumed = (raw - rawStart);
+        consumed = (unsigned int)(raw - rawStart);
         return JTOK_OBJ_OPEN;
     case '}':
         raw++;
-        consumed = (raw - rawStart);
+        consumed = (unsigned int)(raw - rawStart);
         return JTOK_OBJ_CLOSE;
     case '[':
         raw++;
-        consumed = (raw - rawStart);
+        consumed = (unsigned int)(raw - rawStart);
         return JTOK_ARR_OPEN;
     case ']':
         raw++;
-        consumed = (raw - rawStart);
+        consumed = (unsigned int)(raw - rawStart);
         return JTOK_ARR_CLOSE;
 
     case ':':
         raw++;
-        consumed = (raw - rawStart);
+        consumed = (unsigned int)(raw - rawStart);
         return JTOK_COLON;
     case ',':
         raw++;
-        consumed = (raw - rawStart);
+        consumed = (unsigned int)(raw - rawStart);
         return JTOK_COMMA;
 
     case 'n':
@@ -87,15 +87,15 @@ enum jtokentype getJsonToken(std::string& tokenVal, unsigned int& consumed,
     case 'f':
         if (!strncmp(raw, "null", 4)) {
             raw += 4;
-            consumed = (raw - rawStart);
+            consumed = (unsigned int)(raw - rawStart);
             return JTOK_KW_NULL;
         } else if (!strncmp(raw, "true", 4)) {
             raw += 4;
-            consumed = (raw - rawStart);
+            consumed = (unsigned int)(raw - rawStart);
             return JTOK_KW_TRUE;
         } else if (!strncmp(raw, "false", 5)) {
             raw += 5;
-            consumed = (raw - rawStart);
+            consumed = (unsigned int)(raw - rawStart);
             return JTOK_KW_FALSE;
         } else
             return JTOK_ERR;
@@ -165,7 +165,7 @@ enum jtokentype getJsonToken(std::string& tokenVal, unsigned int& consumed,
         }
 
         tokenVal = numStr;
-        consumed = (raw - rawStart);
+        consumed = (unsigned int)(raw - rawStart);
         return JTOK_NUMBER;
         }
 
@@ -227,7 +227,7 @@ enum jtokentype getJsonToken(std::string& tokenVal, unsigned int& consumed,
         if (!writer.finalize())
             return JTOK_ERR;
         tokenVal = valStr;
-        consumed = (raw - rawStart);
+        consumed = (unsigned int)(raw - rawStart);
         return JTOK_STRING;
         }
 

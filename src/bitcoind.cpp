@@ -7,6 +7,7 @@
 #include <config/bitcoin-config.h>
 #endif
 
+#include "RaycoinViewer.h"
 #include <chainparams.h>
 #include <clientversion.h>
 #include <compat.h>
@@ -85,7 +86,7 @@ static bool AppInit(int argc, char* argv[])
         }
         else
         {
-            strUsage += "\nUsage:  bitcoind [options]                     Start " PACKAGE_NAME " Daemon\n";
+            strUsage += "\nUsage:  raycoind [options]                     Start " PACKAGE_NAME " Daemon\n";
             strUsage += "\n" + gArgs.GetHelpMessage();
         }
 
@@ -115,7 +116,7 @@ static bool AppInit(int argc, char* argv[])
         // Error out when loose non-argument tokens are encountered on command line
         for (int i = 1; i < argc; i++) {
             if (!IsSwitchChar(argv[i][0])) {
-                fprintf(stderr, "Error: Command line contains unexpected token '%s', see bitcoind -h for a list of options.\n", argv[i]);
+                fprintf(stderr, "Error: Command line contains unexpected token '%s', see raycoind -h for a list of options.\n", argv[i]);
                 return false;
             }
         }
@@ -125,6 +126,19 @@ static bool AppInit(int argc, char* argv[])
         // Set this early so that parameter interactions go to console
         InitLogging();
         InitParameterInteraction();
+
+        using Args = const WCHAR*[];
+        auto wstring = [](std::string& s){ return std::wstring(s.begin(), s.end()); };
+        RaycoinViewer::inst.parseCommandLineArgs(Args{L"", L"-gpu", wstring(gArgs.GetArg("-gpu", "0")).c_str()}, 3);
+        RaycoinViewer::inst.parseCommandLineArgs(Args{L"", L"-datadir", GetDataDir(false).c_str()}, 3);
+        RaycoinViewer::inst.start();
+        if (!RaycoinViewer::inst.hasAdapter()) return false;
+        if (Params().GenesisBlock().GetHash() != Params().GetConsensus().hashGenesisBlock)
+        {
+            fprintf(stderr, "Error: Failed to reproduce the genesis hash with the selected GPU.\n");
+            return false;
+        }
+
         if (!AppInitBasicSetup())
         {
             // InitError will have been called with detailed error, which ends up on console
@@ -147,7 +161,7 @@ static bool AppInit(int argc, char* argv[])
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
-            fprintf(stdout, "Bitcoin server starting\n");
+            fprintf(stdout, "Raycoin server starting\n");
 
             // Daemonize
             if (daemon(1, 0)) { // don't chdir (1), do close FDs (0)
@@ -182,6 +196,7 @@ static bool AppInit(int argc, char* argv[])
     } else {
         WaitForShutdown();
     }
+    RaycoinViewer::inst.terminate();
     Shutdown(interfaces);
 
     return fRet;

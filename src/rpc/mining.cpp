@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "RaycoinViewer.h"
 #include <amount.h>
 #include <chain.h>
 #include <chainparams.h>
@@ -26,9 +27,12 @@
 #include <validationinterface.h>
 #include <versionbitsinfo.h>
 #include <warnings.h>
+#include <wallet/wallet.h>
+#include <wallet/rpcwallet.h>
 
 #include <memory>
 #include <stdint.h>
+#include <iomanip>
 
 unsigned int ParseConfirmTarget(const UniValue& value)
 {
@@ -104,88 +108,372 @@ static UniValue getnetworkhashps(const JSONRPCRequest& request)
     return GetNetworkHashPS(!request.params[0].isNull() ? request.params[0].get_int() : 120, !request.params[1].isNull() ? request.params[1].get_int() : -1);
 }
 
-UniValue generateBlocks(std::shared_ptr<CReserveScript> coinbaseScript, int nGenerate, uint64_t nMaxTries, bool keepScript)
+using namespace std::chrono;
+extern CCriticalSection cs_hash;
+std::atomic<bool> g_miningInterrupt = false;
+uint256 toUint256(RaycoinViewer::Hash& hash);
+
+template<class T> T getTime();
+template<> seconds getTime()        { return seconds(GetTime()); }
+template<> milliseconds getTime()   { return milliseconds(GetTimeMillis()); }
+
+UniValue generateBlocks(std::shared_ptr<CReserveScript> coinbaseScript, microseconds sleepDuration,
+                        milliseconds blockInterval, seconds statusInterval, seconds logInterval,
+                        int nGenerate, milliseconds maxDuration, uint32_t extranonceMin, uint32_t extranonceMax, CBlock customblock, int height)
 {
-    static const int nInnerLoopCount = 0x10000;
-    int nHeightEnd = 0;
-    int nHeight = 0;
+    if (g_miningInterrupt)
+        throw JSONRPCError(RPC_MISC_ERROR, "Mining already in progress. Use command 'stopgenerate'.");
 
-    {   // Don't keep cs_main locked
-        LOCK(cs_main);
-        nHeight = chainActive.Height();
-        nHeightEnd = nHeight+nGenerate;
-    }
-    unsigned int nExtraNonce = 0;
-    UniValue blockHashes(UniValue::VARR);
-    while (nHeight < nHeightEnd && !ShutdownRequested())
+    try
     {
-        std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript));
-        if (!pblocktemplate.get())
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
-        CBlock *pblock = &pblocktemplate->block;
-        {
-            LOCK(cs_main);
-            IncrementExtraNonce(pblock, chainActive.Tip(), nExtraNonce);
-        }
-        while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount && !CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus())) {
-            ++pblock->nNonce;
-            --nMaxTries;
-        }
-        if (nMaxTries == 0) {
-            break;
-        }
-        if (pblock->nNonce == nInnerLoopCount) {
-            continue;
-        }
-        std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(*pblock);
-        if (!ProcessNewBlock(Params(), shared_pblock, true, nullptr))
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
-        ++nHeight;
-        blockHashes.push_back(pblock->GetHash().GetHex());
+        g_miningInterrupt = true;
+        LogPrintf("Mining started...\n");
+        static const int nonceMax = 0xFFF; //high 20 bits occupied by screen coords
+        int nonce = 0;
+        auto blockIntervalStart = milliseconds();
+        auto statusIntervalStart = getTime<seconds>() - statusInterval + std::min(statusInterval, seconds(3)); //wait a moment to print status
+        auto logIntervalStart = getTime<seconds>();
+        int generated = 0;
+        auto durStart = getTime<milliseconds>();
+        unsigned int nExtraNonceInit = (unsigned int)GetRand((uint64_t)extranonceMax-extranonceMin+1) + extranonceMin;
+        unsigned int nExtraNonce = nExtraNonceInit;
 
-        //mark script as important because it was used at least for one coinbase output if the script came from the wallet
-        if (keepScript)
+        CBlock block;
+        if (!customblock.IsNull())
         {
-            coinbaseScript->KeepScript();
+            block = customblock;
+            IncrementExtraNonce(block, height, --nExtraNonce, nExtraNonceInit); //set extra nonce to current
         }
+
+        {
+            LOCK(cs_hash);
+            RaycoinViewer::inst.resetBestHash();
+            RaycoinViewer::inst.resetTracePerSec();
+        }
+
+        UniValue blocks(UniValue::VARR);
+        while ((nGenerate <= 0 || generated < nGenerate) && (maxDuration <= milliseconds() || getTime<milliseconds>() - durStart < maxDuration) && !ShutdownRequested() && g_miningInterrupt)
+        {
+            if (sleepDuration.count()) boost::this_thread::sleep_for(boost::chrono::microseconds(sleepDuration.count()));
+
+            if (customblock.IsNull() && getTime<milliseconds>() - blockIntervalStart >= blockInterval)
+            {
+                {
+                    LOCK(cs_main);
+                    std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript));
+                    if (!pblocktemplate.get())
+                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
+                    block = pblocktemplate->block;
+                    height = chainActive.Height()+1;
+                }
+                uint32_t extraNonceOld = nExtraNonce;
+                IncrementExtraNonce(block, height, --nExtraNonce, nExtraNonceInit); //set extra nonce to current
+                if (extraNonceOld != nExtraNonce) nonce = 0; //new prev block hash
+                blockIntervalStart = getTime<milliseconds>();
+            }
+
+            if (nonce > nonceMax)
+            {
+                nonce = 0;
+                if (nExtraNonce >= extranonceMax) nExtraNonce = extranonceMin-1;
+                IncrementExtraNonce(block, height, nExtraNonce, nExtraNonceInit);
+            }
+            block.nNonce = nonce++;
+
+            {
+                LOCK(cs_hash);
+                RaycoinViewer::inst.blockInfo(height, block.nNonce, nExtraNonce);
+            }
+            auto hash = block.GetHash(false);
+
+            if (statusInterval > seconds() && getTime<seconds>() - statusIntervalStart >= statusInterval)
+            {
+                LOCK(cs_hash);
+                auto& res = RaycoinViewer::inst.traceResult();
+                std::stringstream s;
+                s << "Mining... ";
+                s << "RT/s: " << std::fixed << std::setw(5) << std::setprecision(2) << RaycoinViewer::inst.tracePerSec() / 1000000.f << "M";
+
+                auto target = ArithToUint256(arith_uint256().SetCompact(block.nBits)).GetHex();
+                if (target.find_last_not_of('0') != std::string::npos) target.erase(target.find_last_not_of('0')+1);
+                s << ", Best: 0x" << toUint256(res.hash).GetHex().substr(0, target.length()) << "...";
+                s << ", Target: 0x" << target << "...";
+
+                LogPrintf("%s\n", s.str().c_str());
+                statusIntervalStart = getTime<seconds>();
+            }
+
+            if (logInterval > seconds() && getTime<seconds>() - logIntervalStart >= logInterval)
+            {
+                LOCK(cs_hash);
+                auto& res = RaycoinViewer::inst.traceResult();
+                auto& log = RaycoinViewer::inst.loadTraceLog();
+                if (!res.success && (!log.size() || memcmp(&res.hash, &log.back().hash, sizeof(res.hash))))
+                {
+                    log.push_back(res);
+                    RaycoinViewer::inst.saveTraceLog();
+                }
+                logIntervalStart = getTime<seconds>();
+            }
+
+            if (!hash.first || !CheckProofOfWork(hash.second, block.nBits, Params().GetConsensus())) continue;
+        
+            {
+                //pack screen coords into nonce before submission
+                LOCK(cs_hash);
+                auto& res = RaycoinViewer::inst.traceResult();
+                block.nNonce = res.pos.x << 22 | res.pos.y << 12 | block.nNonce;
+            }
+
+            if (!ProcessNewBlock(Params(), std::make_shared<const CBlock>(block), true, nullptr))
+            {
+                LogPrintf("Block mined but rejected by ProcessNewBlock: %s\n", block.ToString());
+                //if this is a custom block return it anyway, maybe the pool can submit it
+                if (customblock.IsNull()) continue;
+            }
+
+            if (!generated) coinbaseScript->KeepScript();
+
+            LOCK(cs_hash);
+            auto& res = RaycoinViewer::inst.traceResult();
+            blocks.push_back(RaycoinViewer::inst.saveTrace(res));
+
+            std::stringstream s;
+            s << "Success! You mined a block and earned raycoins! =)";
+            s << "\n{";
+            s << "\n    \"success\": " << std::boolalpha << res.success << ",";
+            s << "\n    \"blockHeight\": " << res.blockHeight << ",";
+            s << "\n    \"blockNonce\": " << res.blockNonce << ",";
+            s << "\n    \"blockExtraNonce\": " << res.blockExtraNonce << ",";
+            s << "\n    \"seed\":   \"0x" << toUint256(res.seed).GetHex() << "\",";
+            s << "\n    \"target\": \"0x" << toUint256(res.target).GetHex() << "\",";
+            s << "\n    \"hash\":   \"0x" << toUint256(res.hash).GetHex() << "\",";
+            s << "\n    \"pos\": {";
+            s << "\n        \"x\": " << res.pos.x << ",";
+            s << "\n        \"y\": " << res.pos.y;
+            s << "\n    },";
+            s << "\n    \"depth\": " << std::setprecision(16) << res.depth << ",";
+            s << "\n    \"timestamp\": " << res.timestamp.time_since_epoch().count() << ",";
+            struct tm tm;
+            auto time = std::chrono::system_clock::to_time_t(res.timestamp);
+            localtime_s(&tm, &time);
+            s << "\n    \"localtime\": \"" << std::put_time(&tm, "%F %T%z") << "\",";
+            s << "\n    \"rewards\": [";
+            auto founders = getFoundersReward();
+            for (auto& e: block.vtx.size() ? block.vtx[0]->vout : std::vector<CTxOut>())
+            {
+                if (e == founders || !e.nValue) continue;
+                s << "\n        {";
+                CTxDestination addr;
+                if (ExtractDestination(e.scriptPubKey, addr))
+                    s << "\n            \"address\": \"" << EncodeDestination(addr) << "\",";
+                else
+                    s << "\n            \"scriptPubKey\": \"0x" << HexStr(e.scriptPubKey) << "\",";
+                auto frac = (std::stringstream() << std::setfill('0') << std::setw(8) << e.nValue % COIN).str();
+                if (frac.find_last_not_of('0') != std::string::npos) frac.erase(frac.find_last_not_of('0')+1);
+                s << "\n            \"value\": " << e.nValue / COIN << "." << frac;
+                s << "\n        },";
+            }
+            s.seekp(-1, s.cur);
+            s << "\n    ]";
+            s << "\n}";
+            LogPrintf("%s\n", s.str().c_str());
+
+            auto& log = RaycoinViewer::inst.loadTraceLog();
+            log.push_back(res);
+            RaycoinViewer::inst.saveTraceLog();
+            logIntervalStart = getTime<seconds>();
+
+            RaycoinViewer::inst.resetBestHash();
+            ++generated;
+            if (!customblock.IsNull()) break; //only mine custom block once
+        }
+
+        UniValue res(UniValue::VOBJ);
+        res.pushKV("blocks", blocks);
+        {
+            LOCK(cs_hash);
+            auto& best = RaycoinViewer::inst.traceResult();
+            if (!best.success) res.pushKV("best", RaycoinViewer::inst.saveTrace(best));
+        }
+
+        g_miningInterrupt = false;
+        LogPrintf("Mining stopped.\n");
+        return res;
     }
-    return blockHashes;
+    catch (UniValue& e)
+    {
+        g_miningInterrupt = false;
+        LogPrintf("Mining stopped.\n");
+        throw e;
+    }
 }
 
-static UniValue generatetoaddress(const JSONRPCRequest& request)
+static UniValue generate(const JSONRPCRequest& request)
 {
-    if (request.fHelp || request.params.size() < 2 || request.params.size() > 3)
+    if (request.fHelp || request.params.size() > 9)
         throw std::runtime_error(
-            "generatetoaddress nblocks address (maxtries)\n"
-            "\nMine blocks immediately to a specified address (before the RPC call returns)\n"
+            "generate (address) (sleepduration) (block-interval) (status-interval) (log-interval) (nblocks) (maxduration) (nonce-range) (blockdata)\n"
+            "\nMine blocks immediately (before the RPC call returns)\n"
             "\nArguments:\n"
-            "1. nblocks      (numeric, required) How many blocks are generated immediately.\n"
-            "2. address      (string, required) The address to send the newly generated bitcoin to.\n"
-            "3. maxtries     (numeric, optional) How many iterations to try (default = 1000000).\n"
+            "1. address         (string, optional)   The address to send any newly generated raycoins to.\n"
+            "                                        (default = 0, get from wallet keypool) (argument ignored if 'blockdata' is specified)\n"
+            "2. sleepduration   (microsec, optional) How long to sleep between hashes, gives worse performance but a more usable PC\n"
+            "                                        and can prevent overheating. (default = 0, no sleep)\n"
+            "3. block-interval  (millisec, optional) How often to create a new block to mine on from the network state.\n"
+            "                                        (default = 300, ~third of a second) (argument ignored if 'blockdata' is specified)\n"
+            "4. status-interval (seconds, optional)  How often to print current block info and perf stats.\n"
+            "                                        (default = 60, 1 minute)\n"
+            "5. log-interval    (seconds, optional)  How often to log the best hash to raytraces.log if unsuccessful.\n"
+            "                                        (default = 86400, 1 day)\n"
+            "6. nblocks         (numeric, optional)  How many blocks are to be generated immediately.\n"
+            "                                        (default = 0, unlimited) (argument ignored if 'blockdata' is specified)\n"
+            "7. maxduration     (millisec, optional) Maximum duration to spend mining.\n"
+            "                                        (default = 0, unlimited)\n"
+            "8. nonce-range     (num-num, optional)  Extranonce will be chosen randomly and increment within this inclusive range.\n"
+            "                                        (default = 0-0, full integer range)\n"
+            "9. blockdata       (hexstr, optional)   The block to mine on encoded in hex bytes, its nonces will be incremented.\n"
+            "                                        (default = 0, create from network state)\n"
             "\nResult:\n"
-            "[ blockhashes ]     (array) hashes of blocks generated\n"
-            "\nExamples:\n"
-            "\nGenerate 11 blocks to myaddress\n"
-            + HelpExampleCli("generatetoaddress", "11 \"myaddress\"")
-            + "If you are running the bitcoin core wallet, you can get a new address to send the newly generated bitcoin to with:\n"
+            "{\n"
+            "  \"blocks\": [                (array) blocks generated\n"
+            "    {\n"
+            "      \"success\": b,          (bool) whether the hash is less than or equal to the target\n"
+            "      \"blockHeight\": n,      (numeric)\n"
+            "      \"blockNonce\": n,       (numeric)\n"
+            "      \"blockExtraNonce\": n,  (numeric)\n"
+            "      \"seed\": \"xxxx\",        (hexstr) Blake2b hash of header with high 20 bits of nonce zeroed out\n"
+            "      \"target\": \"xxxx\",      (hexstr)\n"
+            "      \"hash\": \"xxxx\",        (hexstr)\n"
+            "      \"pos\": {               (json object) screen coords of ray, must pack into header nonce: x<<22|y<<12|blockNonce\n"
+            "        \"x\": n,              (numeric)\n"
+            "        \"y\": n               (numeric)\n"
+            "      },\n"
+            "      \"depth\": n,            (numeric) maximum distance from origin that ray hit\n"
+            "      \"timestamp\": n,        (numeric) Unix epoch time in hundreds of nanoseconds\n"
+            "      \"localtime\": \"ddmmyy\"  (string)\n"
+            "    },\n"
+            "    ...\n"
+            "  ],\n"
+            "  \"best\": { ... }            (json object, optional) block with the best hash if the last mining attempt failed\n"
+            "}\n"
+            "\nNotes:\n\n"
+            "For the first 4 years the network will reject any block with a coinbase that omits\n"
+            "the founders reward: 3HwpSFbMb9P1eKFiE2SnSbbYpXS5mj22e6, 4.95 raycoins\n"
+            "\nExamples:\n\n"
+            "Generate to myaddress and sleep momentarily between hashes\n"
+            + HelpExampleCli("generate", "myaddress 1")
+            + "If you are running the raycoin core wallet, you can get a new address to send any newly generated raycoins to with:\n"
             + HelpExampleCli("getnewaddress", "")
         );
-
-    int nGenerate = request.params[0].get_int();
-    uint64_t nMaxTries = 1000000;
-    if (!request.params[2].isNull()) {
-        nMaxTries = request.params[2].get_int();
+    
+    CBlock block;
+    int height = 0;
+    std::string blockData = !request.params[8].isNull() ? request.params[8].get_str() : "0";
+    if (blockData != "0")
+    {
+        LOCK(cs_main);
+        if (!DecodeHexBlk(block, blockData))
+            throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Custom block decode failed");
+        height = chainActive.Height()+1;
     }
 
-    CTxDestination destination = DecodeDestination(request.params[1].get_str());
-    if (!IsValidDestination(destination)) {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Error: Invalid address");
+    auto coinbaseScript = std::make_shared<CReserveScript>();
+    int nGenerate = 0;
+    auto blockInterval = milliseconds(300);
+    if (block.IsNull())
+    {
+        std::string address = !request.params[0].isNull() ? request.params[0].get_str() : "0";
+        if (address != "0")
+        {
+            auto destination = DecodeDestination(address);
+            if (!IsValidDestination(destination)) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Error: Invalid address");
+            }
+            coinbaseScript->reserveScript = GetScriptForDestination(destination);
+        }
+        else
+        {
+            std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
+            CWallet* const pwallet = wallet.get();
+            if (!EnsureWalletIsAvailable(pwallet, request.fHelp))
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "No wallet available");
+            pwallet->GetScriptForMining(coinbaseScript);
+            // If the keypool is exhausted, no script is returned at all.  Catch this.
+            if (!coinbaseScript)
+                throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");   
+        }
+        //throw an error if no script was provided
+        if (coinbaseScript->reserveScript.empty())
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available");
+
+        if (!request.params[2].isNull()) blockInterval = milliseconds(request.params[2].get_int());
+        if (!request.params[5].isNull()) nGenerate = request.params[5].get_int();
     }
 
-    std::shared_ptr<CReserveScript> coinbaseScript = std::make_shared<CReserveScript>();
-    coinbaseScript->reserveScript = GetScriptForDestination(destination);
+    auto sleepDuration = !request.params[1].isNull() ? microseconds(request.params[1].get_int()) : microseconds();
+    auto statusInterval = !request.params[3].isNull() ? seconds(request.params[3].get_int()) : minutes(1);
+    auto logInterval = !request.params[4].isNull() ? seconds(request.params[4].get_int()) : hours(24);
+    auto maxDuration = !request.params[6].isNull() ? milliseconds(request.params[6].get_int()) : milliseconds();
+    
+    uint32_t extranonceMin = 0;
+    uint32_t extranonceMax = std::numeric_limits<uint32_t>::max();
+    if (!request.params[7].isNull())
+    {
+        auto range = request.params[7].get_str();
+        if (range != "0-0")
+        {
+            int idx = range.find_first_of('-');
+            if (idx == std::string::npos)
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Extranonce range invalid, use syntax: <n>-<n>, ex. 0-10");
+            std::stringstream(range.substr(0, idx)) >> extranonceMin;
+            std::stringstream(range.substr(idx+1, range.length()-idx-1)) >> extranonceMax;
+        }
+    }
 
-    return generateBlocks(coinbaseScript, nGenerate, nMaxTries, false);
+    return generateBlocks(coinbaseScript, sleepDuration, blockInterval, statusInterval, logInterval, nGenerate, maxDuration, extranonceMin, extranonceMax, block, height);
+}
+
+static UniValue getminedblockhash(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "getminedblockhash (blockheader)\n"
+            "\nGenerate block hash from a mined header that contains screen coords packed into the high 20 bits of the nonce.\n"
+            "\nArguments:\n"
+            "1. blockheader               (hexstr, required) the mined block header to hash encoded in hex bytes\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"valid\": b,                (bool)   Whether the ray met all conditions to generate a valid mined hash (hits, depth, target).\n"
+            "                                      If the hash isn't valid then the seed is returned (blake2b of the header with zeroed screen coords).\n"
+            "  \"hash\": \"xxxx\"             (hexstr) hash of the block if valid, otherwise the seed\n"
+            "}\n"
+        );
+
+    CBlockHeader header;
+    if (!DecodeHexBlockHeader(header, request.params[0].get_str()))
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Header decode failed");
+
+    auto hash = header.GetHash(true);
+    UniValue res(UniValue::VOBJ);
+    res.pushKV("valid", hash.first);
+    res.pushKV("hash", hash.second.GetHex());
+    return res;
+}
+
+static UniValue stopgenerate(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() > 0)
+        throw std::runtime_error(
+            "stopgenerate\n"
+            "Interrupt any mining in progress\n"
+            "\nResult:\n"
+            "Whether mining was in progress and interrupted (boolean)\n"
+        );
+
+    bool ret = g_miningInterrupt;
+    g_miningInterrupt = false;
+    return ret;
 }
 
 static UniValue getmininginfo(const JSONRPCRequest& request)
@@ -439,10 +727,10 @@ static UniValue getblocktemplate(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
 
     if (g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0)
-        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Bitcoin is not connected!");
+        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Raycoin is not connected!");
 
     if (IsInitialBlockDownload())
-        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Bitcoin is downloading blocks...");
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Raycoin is downloading blocks...");
 
     static unsigned int nTransactionsUpdatedLast;
 
@@ -650,6 +938,13 @@ static UniValue getblocktemplate(const JSONRPCRequest& request)
     result.pushKV("transactions", transactions);
     result.pushKV("coinbaseaux", aux);
     result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue);
+    if (!getBlockSubsidyHalvings(pindexPrev->nHeight, consensusParams))
+    {
+        UniValue founders(UniValue::VOBJ);
+        founders.pushKV("scriptPubKey", HexStr(pblock->vtx[0]->vout[1].scriptPubKey));
+        founders.pushKV("value", pblock->vtx[0]->vout[1].nValue);
+        result.pushKV("coinbasetxn", founders);
+    }
     result.pushKV("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast));
     result.pushKV("target", hashTarget.GetHex());
     result.pushKV("mintime", (int64_t)pindexPrev->GetMedianTimePast()+1);
@@ -971,9 +1266,10 @@ static const CRPCCommand commands[] =
     { "mining",             "getblocktemplate",       &getblocktemplate,       {"template_request"} },
     { "mining",             "submitblock",            &submitblock,            {"hexdata","dummy"} },
     { "mining",             "submitheader",           &submitheader,           {"hexdata"} },
+    { "mining",             "getminedblockhash",      &getminedblockhash,      {"blockheader"} },
 
-
-    { "generating",         "generatetoaddress",      &generatetoaddress,      {"nblocks","address","maxtries"} },
+    { "generating",         "generate",               &generate,               {"address","sleepduration","block-interval","status-interval","log-interval","nblocks","maxduration","nonce-range","blockdata"} },
+    { "generating",         "stopgenerate",           &stopgenerate,           {} },
 
     { "util",               "estimatesmartfee",       &estimatesmartfee,       {"conf_target", "estimate_mode"} },
 

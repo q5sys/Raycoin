@@ -500,4 +500,42 @@ inline bool IsBlockPruned(const CBlockIndex* pblockindex)
     return (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0);
 }
 
+inline int getBlockSubsidyHalvings(int nHeight, const Consensus::Params& consensusParams)
+{
+    return nHeight / consensusParams.nSubsidyHalvingInterval;
+}
+
+//the founders reward address/amount is encrypted in the executable so that it's not trivially hackable
+#include <crypto\aes.h>
+inline CTxOut getFoundersReward()
+{
+    const uint8_t key[AES256_KEYSIZE] =
+    {
+        0x30,0x7f,0x24,0x61,0x60,0xac,0x0c,0xa5,
+        0x2c,0x1f,0x51,0xaf,0x4a,0x74,0x03,0x78,
+        0x0f,0x63,0x23,0xf0,0x65,0xcd,0x68,0x5f,
+        0x74,0x19,0x12,0xc9,0x3c,0x93,0x0b,0x52
+    };
+    const uint8_t scriptEnc[AES256_KEYSIZE] =
+    {
+        0x5a,0xf3,0xf6,0x02,0xce,0xef,0x36,0x9c,
+        0xae,0xe3,0x8e,0xf3,0x28,0xe5,0x21,0x51,
+        0x74,0x8f,0x6f,0xd5,0x08,0x7f,0xb2,0x51,
+        0x9d,0x14,0xde,0x63,0x8e,0xf2,0x75,0xc1
+    };
+    const int scriptSize = 23;
+    const char* rewardEnc = "2091214576";
+
+    unsigned char ivIn[AES_BLOCKSIZE] = {};
+    AES256CBCDecrypt dec(key, ivIn, true);
+    uint8_t out[AES256_KEYSIZE] = {};
+    dec.Decrypt(scriptEnc, sizeof(scriptEnc), out);
+    CScript script(out, out+scriptSize);
+
+    CAmount reward = 0;
+    std::stringstream(rewardEnc) >> reward;
+    reward ^= key[3] << 24 | key[2] << 16 | key[1] << 8 | key[0];
+    return {reward, script};
+}
+
 #endif // BITCOIN_VALIDATION_H

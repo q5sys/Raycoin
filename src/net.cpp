@@ -1537,7 +1537,7 @@ static void ThreadMapPort()
             }
         }
 
-        std::string strDesc = "Bitcoin " + FormatFullVersion();
+        std::string strDesc = "Raycoin " + FormatFullVersion();
 
         do {
 #ifndef UPNPDISCOVER_SUCCESS
@@ -1640,10 +1640,14 @@ void CConnman::ThreadDNSAddressSeed()
 
     LogPrintf("Loading addresses from DNS seeds (could take a while)\n");
 
+    auto ignoreSeeds = gArgs.GetArgs("-seednodeignore");
     for (const std::string &seed : vSeeds) {
         if (interruptNet) {
             return;
         }
+
+        if (std::find(ignoreSeeds.begin(), ignoreSeeds.end(), seed) != ignoreSeeds.end()) continue;
+
         if (HaveNameProxy()) {
             AddOneShot(seed);
         } else {

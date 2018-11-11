@@ -1,0 +1,43 @@
+For more information visit the forum at: http://ray-coin.com
+
+Requirements:
+
+- Latest Windows 10 October update
+- Nvidia RTX 2080/70/60 GPU (Turing)
+
+=====================================================================
+v1.0
+=====================================================================
+NEW FEATURES:
+--
+
+NOTES:
+Raycoin:
+- to get started mining run the "Raycoin - mine" shortcut on your desktop / start menu
+- mining doesn't quite run at full speed so that your desktop can be more usable, to run at full speed or run slower in the background use the other mining shortcuts in your start menu
+- by default mining uses addresses generated from Raycoin's command-line wallet which is not easy to use, to mine to an address from your electrum wallet edit MINING_ADDRESS with the settings shortcut, also any existing rewards can be exported to your electrum wallet using the export shortcut
+- to mine with multiple GPUs edit GPU_COUNT with the settings shortcut
+
+Raycoin Viewer:
+- Raycoin Viewer is a ray trace hash visualizer, mining sandbox, and mining log viewer for your successful hashes and daily best hashes
+- to visualize the genesis hash, copy and rename genesis-raytraces.log to <user>/AppData/Roaming/Raycoin/raytraces.log and run Raycoin Viewer
+- supports HDR when enabled in windows display settings
+- supports game controllers ('A' button acts like the SHIFT key)
+- on multi-GPU systems you can select which GPU to use with “-gpu <number>”, ex. “-gpu 1”, default is 0
+- you can specify the data directory with "-datadir <path>", ex. "-datadir C:\\Temp\\Raycoin"
+
+Raycoin Command-Line:
+- to mine manually open "Raycoin Console" or shift-right-click in the Raycoin folder and select "open powershell window here" and run the command: "./raycoin-cli generate"
+- to stop mining: "./raycoin-cli stopgenerate"
+- to allow your desktop to be more usable while mining try sleeping momentarily: "./raycoin-cli generate 0 1000"
+- for more options see: "./raycoin-cli help generate"
+- on multi-GPU systems you can select which GPU to use with "-gpu=<number>”, ex. “-gpu=1”, default is 0
+
+CHANGES:
+--
+
+BUG FIXES:
+--
+
+KNOWN ISSUES:
+--

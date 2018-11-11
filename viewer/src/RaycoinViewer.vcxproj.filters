@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <FxCompile Include="initFieldCS.hlsl" />
+    <FxCompile Include="hitShader.hlsl" />
+    <FxCompile Include="missShader.hlsl" />
+    <FxCompile Include="RayGenerationShader.hlsl" />
+    <FxCompile Include="lineHitShader.hlsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="RaycoinViewer.h" />
+    <ClInclude Include="RaycoinViewerCompute.h" />
+    <ClInclude Include="RaycoinViewerRayTracing.h" />
+    <ClInclude Include="RaycoinViewerShader.h" />
+    <ClInclude Include="blake2s.hlsli" />
+    <ClInclude Include="hlslCompat.h" />
+    <ClInclude Include="resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+    <None Include="trace.hlsli" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="RaycoinViewer.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="RaycoinViewer.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="icon1.ico" />
+    <Image Include="raycoin.ico" />
+  </ItemGroup>
+</Project>

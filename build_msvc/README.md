@@ -23,7 +23,8 @@ The external dependencies required for the Visual Studio build are (see the [dep
 - OpenSSL,
 - Boost,
 - libevent,
-- ZeroMQ
+- ZeroMQ,
+- zlib
 
 Additional dependencies required from the [bitcoin-core](https://github.com/bitcoin-core) github repository are:
 - SECP256K1,
@@ -44,7 +45,8 @@ The instructions below use vcpkg to install the dependencies.
     zeromq:x64-windows-static `
     berkeleydb:x64-windows-static `
     secp256k1:x64-windows-static `
-    leveldb:x64-windows-static
+    leveldb:x64-windows-static `
+    zlib:x64-windows-static
 ```
 
 - Use Python to generate *.vcxproj from Makefile
