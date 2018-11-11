@@ -309,7 +309,7 @@ bool comparei(wstring& str, wstring &str2)
         });
 }
 
-void parseCommandLineArgs(WCHAR* argv[], int argc)
+void RaycoinViewer::parseCommandLineArgs(WCHAR* argv[], int argc)
 {
     int consumed;
     for (int argi = 1; argi < argc; argi+=consumed)
@@ -317,10 +317,8 @@ void parseCommandLineArgs(WCHAR* argv[], int argc)
         consumed = 1;
         if (argi+1 < argc && comparei(wstring(argv[argi]), wstring(L"-gpu")))
         {
-            int gpu = 0;
             wstringstream s(argv[argi+1]);
-            s >> gpu;
-            RaycoinViewer::selectGPU(gpu);
+            s >> Graphics::g_gpuSelect;
             consumed = 2;
         }
         else if (argi+1 < argc && comparei(wstring(argv[argi]), wstring(L"-datadir")))
@@ -337,7 +335,7 @@ int wmain(int argc, WCHAR* argv[])
     if (SHGetSpecialFolderPathW(nullptr, defaultPath, CSIDL_APPDATA, true))
         EngineTuning::g_settingsPath = wstring(defaultPath) + L"\\" + L"Raycoin";
 
-    parseCommandLineArgs(argv, argc);
+    RaycoinViewer::parseCommandLineArgs(argv, argc);
 
     WCHAR absPath[MAX_PATH] = L"";
     if (GetFullPathNameW(EngineTuning::g_settingsPath.c_str(), MAX_PATH, absPath, nullptr))
@@ -346,11 +344,6 @@ int wmain(int argc, WCHAR* argv[])
 
     RaycoinViewer::start();
     return 0;
-}
-
-void RaycoinViewer::selectGPU(int gpu)
-{
-    Graphics::g_gpuSelect = gpu;
 }
 
 void RaycoinViewer::start()

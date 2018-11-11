@@ -38,7 +38,7 @@ public:
 
     RaycoinViewer() {}
 
-    static void selectGPU(int gpu);
+    static void parseCommandLineArgs(WCHAR* argv[], int argc);
     static void start();
 
     virtual void Startup() override;
