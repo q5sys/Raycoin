@@ -1,11 +1,5 @@
 # Build directories
-Debug/*
-Release/*
+Build
+Packages
 .vs
-packages/*
-*/Obj
-*/Debug
-*/Release
-*/x64
 *.vcxproj.user
-*.vcxproj

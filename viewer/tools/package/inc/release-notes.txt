@@ -1,0 +1,28 @@
+For more information visit the forum at: http://ray-coin.com
+
+Requirements:
+
+- Latest Windows 10 October update
+- Nvidia RTX 2080/70 GPU (Turing)
+
+=====================================================================
+v0.5
+=====================================================================
+NEW FEATURES:
+--
+
+NOTES:
+- initial preview release
+- this is the Ray Tracing Proof-of-Work visualizer only, it's just a sandbox that doesn't actually mine raycoins
+- supports HDR when enabled in windows display settings
+- supports game controllers ('A' button acts like the SHIFT key)
+- on multi-GPU systems you can select which GPU to use on the command line with “-gpu <number>”, ex. “-gpu 1”, default is 0
+
+CHANGES:
+--
+
+BUG FIXES:
+--
+
+KNOWN ISSUES:
+--
