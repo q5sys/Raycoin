@@ -85,7 +85,7 @@ static bool AppInit(int argc, char* argv[])
         }
         else
         {
-            strUsage += "\nUsage:  bitcoind [options]                     Start " PACKAGE_NAME " Daemon\n";
+            strUsage += "\nUsage:  raycoind [options]                     Start " PACKAGE_NAME " Daemon\n";
             strUsage += "\n" + gArgs.GetHelpMessage();
         }
 
