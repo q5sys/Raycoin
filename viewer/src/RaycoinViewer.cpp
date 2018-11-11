@@ -26,6 +26,7 @@
 #include "univalue.h"
 #include <fstream>
 #include <iomanip>
+#include <Shlobj.h>
 
 #include "CompiledShaders/rayGenerationShader.h"
 #include "CompiledShaders/hitShader.h"
@@ -266,6 +267,28 @@ UINT g_shaderRecordSizeInBytes;
 namespace Graphics
 {
     extern int g_gpuSelect;
+    extern int g_skipPresent;
+    extern EnumVar DebugZoom;
+}
+
+namespace EngineTuning
+{
+    extern bool sm_IsVisible;
+    void StartSave(void*);
+    void StartLoad(void*);
+    extern std::wstring g_settingsPath;
+}
+
+namespace EngineProfiling
+{
+    extern BoolVar DrawFrameRate;
+    extern BoolVar DrawProfiler;
+}
+
+namespace TextRenderer
+{
+    extern Color g_color;
+    extern Color g_hiColor;
 }
 
 bool comparei(string& str, string &str2)
@@ -300,16 +323,27 @@ void parseCommandLineArgs(WCHAR* argv[], int argc)
             RaycoinViewer::selectGPU(gpu);
             consumed = 2;
         }
-        //else if ()
-        //{
-        //
-        //}
+        else if (argi+1 < argc && comparei(wstring(argv[argi]), wstring(L"-datadir")))
+        {
+            EngineTuning::g_settingsPath = argv[argi+1];
+            consumed = 2;
+        }
     }
 }
 
 int wmain(int argc, WCHAR* argv[])
 {
+    WCHAR defaultPath[MAX_PATH] = L"";
+    if (SHGetSpecialFolderPathW(nullptr, defaultPath, CSIDL_APPDATA, true))
+        EngineTuning::g_settingsPath = wstring(defaultPath) + L"\\" + L"Raycoin";
+
     parseCommandLineArgs(argv, argc);
+
+    WCHAR absPath[MAX_PATH] = L"";
+    if (GetFullPathNameW(EngineTuning::g_settingsPath.c_str(), MAX_PATH, absPath, nullptr))
+        EngineTuning::g_settingsPath = absPath;
+    SHCreateDirectoryExW(nullptr, EngineTuning::g_settingsPath.c_str(), nullptr);
+
     RaycoinViewer::start();
     return 0;
 }
@@ -904,31 +938,6 @@ pair<bool, Vector3> intersect(const Plane& plane, const Ray& ray)
 
     if (t < 0) return make_pair(false, Vector3()); //Intersection behind ray
     return make_pair(true, ray.origin + ray.dir*t);
-}
-
-namespace Graphics
-{
-    extern int g_skipPresent;
-    extern EnumVar DebugZoom;
-}
-
-namespace EngineTuning
-{
-    extern bool sm_IsVisible;
-    void StartSave(void*);
-    void StartLoad(void*);
-}
-
-namespace EngineProfiling
-{
-    extern BoolVar DrawFrameRate;
-    extern BoolVar DrawProfiler;
-}
-
-namespace TextRenderer
-{
-    extern Color g_color;
-    extern Color g_hiColor;
 }
 
 bool RaycoinViewer::hasAdapter() const { return g_Device; }
@@ -1899,7 +1908,7 @@ vector<RaycoinViewer::TraceResult>& RaycoinViewer::loadTraceLog()
     try
     {
         string str;
-        ifstream is(g_traceLogFile);
+        ifstream is(EngineTuning::g_settingsPath + L"\\" + wstring(g_traceLogFile.begin(), g_traceLogFile.end()));
         is.exceptions(ifstream::failbit | ifstream::badbit);
         char buf[1024];
         auto& read = [&]{ str += string(buf, is.gcount()); };
@@ -2006,7 +2015,7 @@ void RaycoinViewer::saveTraceLog()
 
     try
     {
-        ofstream os(g_traceLogFile);
+        ofstream os(EngineTuning::g_settingsPath + L"\\" + wstring(g_traceLogFile.begin(), g_traceLogFile.end()));
         os.exceptions(ofstream::failbit | ofstream::badbit);
         os << vals.write(4);
         _traceLogStatus = "Saved " + g_traceLogFile;

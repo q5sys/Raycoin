@@ -49,6 +49,7 @@ namespace EngineTuning
 
     std::string g_settingsFile = "engineTuning.txt";
     std::string g_settingsStatus;
+    std::wstring g_settingsPath;
 }
 
 using namespace EngineTuning;
@@ -560,7 +561,7 @@ namespace EngineTuning
         VariableGroup::sm_RootGroup.Save(vals);
         try
         {
-            ofstream os(g_settingsFile);
+            ofstream os(g_settingsPath + L"\\" + wstring(g_settingsFile.begin(), g_settingsFile.end()));
             os.exceptions(ofstream::failbit | ofstream::badbit);
             os << vals.write(4);
             g_settingsStatus = "Saved " + g_settingsFile;
@@ -581,7 +582,7 @@ namespace EngineTuning
         try
         {
             string str;
-            ifstream is(g_settingsFile);
+            ifstream is(g_settingsPath + L"\\" + wstring(g_settingsFile.begin(), g_settingsFile.end()));
             is.exceptions(ifstream::failbit | ifstream::badbit);
             char buf[1024];
             auto& read = [&]{ str += string(buf, is.gcount()); };
