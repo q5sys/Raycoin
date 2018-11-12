@@ -2048,6 +2048,11 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
                                block.vtx[0]->GetValueOut(), blockReward),
                                REJECT_INVALID, "bad-cb-amount");
 
+    //ensure valid founders reward if within first 4 years
+    if (!getBlockSubsidyHalvings(pindex->nHeight, chainparams.GetConsensus()) &&
+            std::find(block.vtx[0]->vout.begin(), block.vtx[0]->vout.end(), getFoundersReward()) == block.vtx[0]->vout.end())
+        return state.DoS(100, error("ConnectBlock(): coinbase does not have a valid founders reward"), REJECT_INVALID, "bad-cb-founders");
+
     if (!control.Wait())
         return state.DoS(100, error("%s: CheckQueue failed", __func__), REJECT_INVALID, "block-validation-failed");
     int64_t nTime4 = GetTimeMicros(); nTimeVerify += nTime4 - nTime2;
