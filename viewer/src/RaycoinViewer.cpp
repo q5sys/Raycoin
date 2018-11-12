@@ -10,7 +10,7 @@
 #include "dxgi1_3.h"
 #include "GameCore.h"
 #include "BufferManager.h"
-#include "Model.h"
+#include "VectorMath.h"
 #include "ReadbackBuffer.h"
 #include "CommandContext.h"
 #include "SamplerManager.h"
@@ -32,18 +32,19 @@
 #include "CompiledShaders/hitShader.h"
 #include "CompiledShaders/missShader.h"
 #include "CompiledShaders/lineHitShader.h"
-#include "RaycoinViewerRayTracing.h"
-#include "D3D12RaytracingFallback.h"
-
 #include "CompiledShaders/initFieldCS.h"
-#include "RaycoinViewerCompute.h"
 
-#include "RaycoinViewer.h"
+#include "D3D12RaytracingFallback.h"
 
 using namespace std;
 using namespace GameCore;
-using namespace Math;
 using namespace Graphics;
+using namespace Math;
+
+#include "RaycoinViewerRayTracing.h"
+#include "RaycoinViewerCompute.h"
+#include "RaycoinViewer.h"
+
 
 static const int g_fov = 120;
 static const float g_zRange[2] = {0.1, 1000};

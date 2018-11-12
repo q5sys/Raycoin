@@ -43,8 +43,8 @@
     <ApplicationEnvironment>title</ApplicationEnvironment>
     <DefaultLanguage>en-US</DefaultLanguage>
     <Keyword>Win32Proj</Keyword>
-    <ProjectName>RaycoinViewer</ProjectName>
-    <RootNamespace>RaycoinViewer</RootNamespace>
+    <ProjectName>RaycoinViewer_lib</ProjectName>
+    <RootNamespace>RaycoinViewer_lib</RootNamespace>
     <PlatformToolset>v141</PlatformToolset>
     <MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>
     <TargetRuntime>Native</TargetRuntime>
