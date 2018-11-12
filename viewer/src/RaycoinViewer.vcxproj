@@ -230,14 +230,11 @@
     <ProjectReference Include="..\MiniEngine\Core\Core_VS15.vcxproj">
       <Project>{86a58508-0d6a-4786-a32f-01a301fdc6f3}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\MiniEngine\Model\Model_VS15.vcxproj">
-      <Project>{5d3aeefb-8789-48e5-9bd9-09c667052d09}</Project>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ItemDefinitionGroup>
     <Link>
-      <AdditionalLibraryDirectories>..\Packages\zlib-vc140-static-64.1.2.11\lib\native\libs\x64\static\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\build_msvc\packages\zlib-vc140-static-64.1.2.11\lib\native\libs\x64\static\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>zlibstatic.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>
       </AdditionalOptions>
@@ -267,15 +264,15 @@ PostbuildCopy.bat "$(OutDir)"</Command>
       <UseLibraryDependencyInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</UseLibraryDependencyInputs>
     </ProjectReference>
     <PreBuildEvent>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cd $(SolutionDir)\tools\
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cd $(SolutionDir)..\tools\
 fallback\PrebuildCheck.bat</Command>
     </PreBuildEvent>
     <PreBuildEvent>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">cd $(SolutionDir)\tools\
+      <Command Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">cd $(SolutionDir)..\tools\
 fallback\PrebuildCheck.bat</Command>
     </PreBuildEvent>
     <PreBuildEvent>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">cd $(SolutionDir)\tools\
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">cd $(SolutionDir)..\tools\
 fallback\PrebuildCheck.bat</Command>
     </PreBuildEvent>
     <FxCompile>
@@ -296,12 +293,12 @@ fallback\PrebuildCheck.bat</Command>
     </ClCompile>
   </ItemDefinitionGroup>
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="..\Packages\WinPixEventRuntime.1.0.180612001\build\WinPixEventRuntime.targets" Condition="Exists('..\Packages\WinPixEventRuntime.1.0.180612001\build\WinPixEventRuntime.targets')" />
+    <Import Project="..\..\build_msvc\packages\WinPixEventRuntime.1.0.180612001\build\WinPixEventRuntime.targets" Condition="Exists('..\..\build_msvc\packages\WinPixEventRuntime.1.0.180612001\build\WinPixEventRuntime.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\Packages\WinPixEventRuntime.1.0.180612001\build\WinPixEventRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\Packages\WinPixEventRuntime.1.0.180612001\build\WinPixEventRuntime.targets'))" />
+    <Error Condition="!Exists('..\..\build_msvc\packages\WinPixEventRuntime.1.0.180612001\build\WinPixEventRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\build_msvc\packages\WinPixEventRuntime.1.0.180612001\build\WinPixEventRuntime.targets'))" />
   </Target>
 </Project>
