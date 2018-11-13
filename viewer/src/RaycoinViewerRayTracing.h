@@ -38,6 +38,7 @@ struct HitShaderConstants
     Bool    trace;
     Bool    compute;
     Bool    hashing;
+    Bool    bestHash;
 };
 
 struct Attrib

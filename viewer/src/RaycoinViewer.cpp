@@ -23,7 +23,6 @@
 #include <unordered_map>
 #include <ctime>
 #include "blake2.h"
-#include "univalue.h"
 #include <fstream>
 #include <iomanip>
 #include <Shlobj.h>
@@ -1002,6 +1001,10 @@ void RaycoinViewer::Startup( void )
 
     _result = {};
     g_traceResult = {};
+    _bestHash = true;
+    _blockHeight = 0;
+    _blockNonce = 0;
+    _blockExtraNonce = 0;
     _seed = {};
     srand((UINT)time(0));
     _target = {};
@@ -1296,7 +1299,7 @@ void RaycoinViewer::Update(float deltaT)
         if (g_mode == MODE_COMPUTE)
         {
             _result = {};
-            _result.hash.fill(~0);
+            resetBestHash();
             g_traceResult = {};
             g_rayLen = 0;
             g_rayHitInsts = {};
@@ -1480,6 +1483,7 @@ void RaycoinViewer::RenderScene(void)
         inputs.trace = g_mode != MODE_DIFFUSE;
         inputs.compute = g_mode == MODE_COMPUTE;
         inputs.hashing = g_hashing;
+        inputs.bestHash = _bestHash;
 
         float costheta = cosf(g_sunOrientation);
         float sintheta = sinf(g_sunOrientation);
@@ -1897,6 +1901,35 @@ void RaycoinViewer::RenderUI(class GraphicsContext& context)
     text.End();
 }
 
+RaycoinViewer::TraceResult RaycoinViewer::loadTrace(const UniValue& val)
+{
+    TraceResult res;
+    res.success = val["success"].get_bool();
+    res.blockHeight = val["blockHeight"].get_int();
+    res.blockNonce = (UINT)val["blockNonce"].get_int64();
+    res.blockExtraNonce = (UINT)val["blockExtraNonce"].get_int64();
+    auto readHash = [&](string key, Hash& hash)
+    {
+        stringstream s(val[key].get_str());
+        string str;
+        str.resize(8);
+        s.ignore(2);
+        for (auto& e : hash)
+        {
+            s.read(&str[0], 8);
+            stringstream(str) >> hex >> e;
+        }
+    };
+    readHash("seed", res.seed);
+    readHash("target", res.target);
+    readHash("hash", res.hash);
+    res.pos.x = val["pos"]["x"].get_int();
+    res.pos.y = val["pos"]["y"].get_int();
+    res.depth = (float)val["depth"].get_real();
+    res.timestamp = Time(Time::duration(val["timestamp"].get_int64()));
+    return res;
+}
+
 vector<RaycoinViewer::TraceResult>& RaycoinViewer::loadTraceLog()
 {
     try
@@ -1920,28 +1953,7 @@ vector<RaycoinViewer::TraceResult>& RaycoinViewer::loadTraceLog()
             {
                 try
                 {
-                    TraceResult res;
-                    res.blockHeight = val["blockHeight"].get_int();
-                    auto readHash = [&](string key, Hash& hash)
-                    {
-                        stringstream s(val[key].get_str());
-                        string str;
-                        str.resize(8);
-                        s.ignore(2);
-                        for (auto& e : hash)
-                        {
-                            s.read(&str[0], 8);
-                            stringstream(str) >> hex >> e;
-                        }
-                    };
-                    readHash("seed", res.seed);
-                    readHash("target", res.target);
-                    readHash("hash", res.hash);
-                    res.pos.x = val["pos"]["x"].get_int();
-                    res.pos.y = val["pos"]["y"].get_int();
-                    res.depth = (float)val["depth"].get_real();
-                    res.timestamp = Time(Time::duration(val["timestamp"].get_int64()));
-                    results.push_back(res);
+                    results.push_back(loadTrace(val));
                 }
                 catch (exception& e)
                 {
@@ -1971,41 +1983,46 @@ vector<RaycoinViewer::TraceResult>& RaycoinViewer::loadTraceLog()
     return _traceLog;
 }
 
+UniValue RaycoinViewer::saveTrace(const TraceResult& res)
+{
+    UniValue val(UniValue::VOBJ);
+    val.pushKV("success", res.success);
+    val.pushKV("blockHeight", res.blockHeight);
+    val.pushKV("blockNonce", (int64_t)res.blockNonce);
+    val.pushKV("blockExtraNonce", (int64_t)res.blockExtraNonce);
+    auto writeHash = [&](string key, const Hash& hash)
+    {
+        stringstream s;
+        s << "0x";
+        for (auto& e : hash) s << hex << setw(8) << setfill('0') << e;
+        val.pushKV(key, s.str());
+    };
+    writeHash("seed", res.seed);
+    writeHash("target", res.target);
+    writeHash("hash", res.hash);
+    {
+        UniValue vals(UniValue::VOBJ);
+        vals.pushKV("x", res.pos.x);
+        vals.pushKV("y", res.pos.y);
+        val.pushKV("pos", vals);
+    }
+    val.pushKV("depth", res.depth);
+    val.pushKV("timestamp", res.timestamp.time_since_epoch().count());
+    {
+        std::stringstream s;
+        struct tm tm;
+        auto time = std::chrono::system_clock::to_time_t(res.timestamp);
+        localtime_s(&tm, &time);
+        s << put_time(&tm, "%F %T%z");
+        val.pushKV("localtime", s.str().c_str());
+    }
+    return val;
+}
+
 void RaycoinViewer::saveTraceLog()
 {
     UniValue vals(UniValue::VARR);
-    for (auto& res : _traceLog)
-    {
-        UniValue val(UniValue::VOBJ);
-        val.pushKV("blockHeight", res.blockHeight);
-        auto writeHash = [&](string key, Hash& hash)
-        {
-            stringstream s;
-            s << "0x";
-            for (auto& e : hash) s << hex << setw(8) << setfill('0') << e;
-            val.pushKV(key, s.str());
-        };
-        writeHash("seed", res.seed);
-        writeHash("target", res.target);
-        writeHash("hash", res.hash);
-        {
-            UniValue vals(UniValue::VOBJ);
-            vals.pushKV("x", res.pos.x);
-            vals.pushKV("y", res.pos.y);
-            val.pushKV("pos", vals);
-        }
-        val.pushKV("depth", res.depth);
-        val.pushKV("timestamp", res.timestamp.time_since_epoch().count());
-        {
-            std::stringstream s;
-            struct tm tm;
-            auto time = std::chrono::system_clock::to_time_t(res.timestamp);
-            localtime_s(&tm, &time);
-            s << put_time(&tm, "%F %T%z");
-            val.pushKV("localtime", s.str().c_str());
-        }
-        vals.push_back(val);
-    }
+    for (auto& res : _traceLog) vals.push_back(saveTrace(res));
 
     try
     {

@@ -211,9 +211,11 @@ fallback\PrebuildCheck.bat</Command>
     </PreBuildEvent>
     <FxCompile>
       <EnableDebuggingInformation Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</EnableDebuggingInformation>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">COMPUTE_ONLY</PreprocessorDefinitions>
     </FxCompile>
     <FxCompile>
       <EnableDebuggingInformation Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">false</EnableDebuggingInformation>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">COMPUTE_ONLY</PreprocessorDefinitions>
     </FxCompile>
     <ClCompile />
     <ClCompile>
@@ -243,6 +245,9 @@ fallback\PrebuildCheck.bat</Command>
     <ClCompile>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">_WIN32;COMPUTE_ONLY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <FxCompile>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">COMPUTE_ONLY</PreprocessorDefinitions>
+    </FxCompile>
   </ItemDefinitionGroup>
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\..\build_msvc\packages\WinPixEventRuntime.1.0.181027001\build\WinPixEventRuntime.targets" Condition="Exists('..\..\build_msvc\packages\WinPixEventRuntime.1.0.181027001\build\WinPixEventRuntime.targets')" />

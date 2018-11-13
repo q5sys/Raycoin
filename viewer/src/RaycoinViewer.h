@@ -4,11 +4,12 @@
 
 #pragma once
 
+#include <chrono>
 #include "GameCore.h"
 #include "GraphicsCore.h"
 #include "CameraController.h"
 #include "Camera.h"
-#include <chrono>
+#include "univalue.h"
 
 #define RAYCOIN_VERSION_MAJOR 0
 #define RAYCOIN_VERSION_MINOR 5
@@ -28,6 +29,8 @@ public:
     {
         bool success;
         int blockHeight;
+        UINT blockNonce;
+        UINT blockExtraNonce;
         Hash seed;
         Hash target;
         Hash hash;
@@ -49,12 +52,18 @@ public:
     virtual void RenderUI(class GraphicsContext&) override;
 
     bool hasAdapter() const;
+    void bestHash(bool enable)                  { _bestHash = enable; }
+    void resetBestHash()                        { _result.hash.fill(~0); } 
+    void blockInfo(int blockHeight, UINT blockNonce, UINT blockExtraNonce) { _blockHeight = blockHeight; _blockNonce = blockNonce; _blockExtraNonce = blockExtraNonce; }
     void seed(const Hash& seed)                 { _seed = seed; }
     void targetHash(const Hash& target)         { _target = target; }
     void verifyPos(const ScreenCoord& pos)      { _verifyPos = pos; }
-
+    
     const TraceResult& traceResult() const      { return _result; }
     float tracePerSec() const                   { return _tracePerSec; }
+
+    TraceResult loadTrace(const UniValue& val);
+    UniValue saveTrace(const TraceResult& res);
 
     std::vector<TraceResult>& loadTraceLog();
     void saveTraceLog();
@@ -80,6 +89,10 @@ private:
 
     RootSignature   _rootSig;
     ComputePSO      _initFieldPSO;
+    bool            _bestHash;
+    int             _blockHeight;
+    UINT            _blockNonce;
+    UINT            _blockExtraNonce;
     Hash            _seed;
     Hash            _target;
     ScreenCoord     _verifyPos;

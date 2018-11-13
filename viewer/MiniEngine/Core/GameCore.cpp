@@ -44,6 +44,7 @@ namespace GameCore
 {
     using namespace Graphics;
     const bool TestGenerateMips = false;
+    bool g_computeOnly = false;
 
     void InitializeApplication( IGameApp& game )
     {

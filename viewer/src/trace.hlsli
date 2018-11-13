@@ -182,7 +182,7 @@ float3 trace(RayPayload initPayload)
                     }
                 }
             }
-            else
+            else if (g.bestHash)
             {
                 //log best hash, we want to avoid waiting long for a lock, so settle for less than perfect logging
                 int triesMax = 5;
