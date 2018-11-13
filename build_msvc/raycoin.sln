@@ -18,6 +18,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libbitcoin_crypto", "libbit
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libbitcoin_server", "libbitcoin_server\libbitcoin_server.vcxproj", "{460FEE33-1FE1-483F-B3BF-931FF8E969A5}"
 	ProjectSection(ProjectDependencies) = postProject
+		{FAA26500-AF2E-4C27-B7EB-03BAAE424A5A} = {FAA26500-AF2E-4C27-B7EB-03BAAE424A5A}
 		{0F7DAFC8-290E-38CE-A643-558A22E9D088} = {0F7DAFC8-290E-38CE-A643-558A22E9D088}
 	EndProjectSection
 EndProject

@@ -7,6 +7,7 @@
 #include <config/bitcoin-config.h>
 #endif
 
+#include "RaycoinViewer.h"
 #include <chainparams.h>
 #include <clientversion.h>
 #include <compat.h>
@@ -63,6 +64,8 @@ static bool AppInit(int argc, char* argv[])
     interfaces.chain = interfaces::MakeChain();
 
     bool fRet = false;
+
+
 
     //
     // Parameters
@@ -169,6 +172,11 @@ static bool AppInit(int argc, char* argv[])
             return false;
         }
         fRet = AppInitMain(interfaces);
+
+        using Args = const WCHAR*[];
+        auto wstring = [](std::string& s){ return std::wstring(s.begin(), s.end()); };
+        RaycoinViewer::parseCommandLineArgs(Args{L"", L"-gpu", wstring(gArgs.GetArg("-gpu", "0")).c_str()}, 3);
+        RaycoinViewer::parseCommandLineArgs(Args{L"", L"-datadir", GetDataDir(false).c_str()}, 3);
     }
     catch (const std::exception& e) {
         PrintExceptionContinue(&e, "AppInit()");

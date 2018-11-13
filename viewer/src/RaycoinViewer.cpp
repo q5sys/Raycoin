@@ -309,7 +309,7 @@ bool comparei(wstring& str, wstring &str2)
         });
 }
 
-void RaycoinViewer::parseCommandLineArgs(WCHAR* argv[], int argc)
+void RaycoinViewer::parseCommandLineArgs(const WCHAR* argv[] , int argc)
 {
     int consumed;
     for (int argi = 1; argi < argc; argi+=consumed)
@@ -329,7 +329,7 @@ void RaycoinViewer::parseCommandLineArgs(WCHAR* argv[], int argc)
     }
 }
 
-int wmain(int argc, WCHAR* argv[])
+int wmain(int argc, const WCHAR* argv[])
 {
     WCHAR defaultPath[MAX_PATH] = L"";
     if (SHGetSpecialFolderPathW(nullptr, defaultPath, CSIDL_APPDATA, true))

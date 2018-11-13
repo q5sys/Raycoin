@@ -5,6 +5,7 @@
 #pragma once
 
 #include <chrono>
+#include <array>
 #include "GameCore.h"
 #include "GraphicsCore.h"
 #include "CameraController.h"
@@ -41,7 +42,7 @@ public:
 
     RaycoinViewer() {}
 
-    static void parseCommandLineArgs(WCHAR* argv[], int argc);
+    static void parseCommandLineArgs(const WCHAR* argv[], int argc);
     static void start();
 
     virtual void Startup() override;
