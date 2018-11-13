@@ -8,6 +8,9 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test_libbitcoinconsensus", "testconsensus\testconsensus.vcxproj", "{E78473E9-B850-456C-9120-276301E04C06}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "raycoind", "bitcoind\bitcoind.vcxproj", "{D4513DDF-6013-44DC-ADCC-12EAF6D1F038}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019} = {C2ED4C4C-B92C-4E42-910D-0073DE87C019}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libbitcoin_util", "libbitcoin_util\libbitcoin_util.vcxproj", "{B53A5535-EE9D-4C6F-9A26-F79EE3BC3754}"
 EndProject
@@ -45,6 +48,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FallbackLayer", "..\viewer\Libraries\D3D12RaytracingFallback\src\FallbackLayer.vcxproj", "{4BE280A6-1066-41CA-ACDD-6BB7E532508B}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "blake2", "..\viewer\Libraries\BLAKE2\src\win\blake2.vcxproj", "{FAA26500-AF2E-4C27-B7EB-03BAAE424A5A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RaycoinViewer_lib", "..\viewer\src\RaycoinViewer_lib.vcxproj", "{C2ED4C4C-B92C-4E42-910D-0073DE87C019}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -447,15 +452,32 @@ Global
 		{FAA26500-AF2E-4C27-B7EB-03BAAE424A5A}.RelWithDebInfo|x64.Build.0 = Release|x64
 		{FAA26500-AF2E-4C27-B7EB-03BAAE424A5A}.RelWithDebInfo|x86.ActiveCfg = Release|Win32
 		{FAA26500-AF2E-4C27-B7EB-03BAAE424A5A}.RelWithDebInfo|x86.Build.0 = Release|Win32
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.Debug|x64.ActiveCfg = Debug|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.Debug|x64.Build.0 = Debug|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.Debug|x86.ActiveCfg = Debug|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.MinSizeRel|x64.ActiveCfg = Release|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.MinSizeRel|x64.Build.0 = Release|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.MinSizeRel|x86.ActiveCfg = Release|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.MinSizeRel|x86.Build.0 = Release|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.Profile|x64.ActiveCfg = Profile|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.Profile|x64.Build.0 = Profile|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.Profile|x86.ActiveCfg = Profile|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.Release|x64.ActiveCfg = Release|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.Release|x64.Build.0 = Release|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.Release|x86.ActiveCfg = Release|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.RelWithDebInfo|x64.ActiveCfg = Release|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.RelWithDebInfo|x64.Build.0 = Release|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.RelWithDebInfo|x86.ActiveCfg = Release|x64
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019}.RelWithDebInfo|x86.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		        SolutionGuid = {DA7D16A6-E5F0-45B3-B194-C3FE64F1BFCD}
-		                                SolutionGuid = {D0CAE2D0-8DB1-4A0B-80EE-800AA6C64323}
-		                        SolutionGuid = {2FB733C9-24CB-4BA5-A26B-F43DAD7996B7}
-		                SolutionGuid = {4ABD1207-9A90-4EC9-A8EB-203638A2605D}
 		SolutionGuid = {26F77E38-08EC-4902-8C15-2DFA12C7C81C}
+		                SolutionGuid = {4ABD1207-9A90-4EC9-A8EB-203638A2605D}
+		                        SolutionGuid = {2FB733C9-24CB-4BA5-A26B-F43DAD7996B7}
+		                                SolutionGuid = {D0CAE2D0-8DB1-4A0B-80EE-800AA6C64323}
+		        SolutionGuid = {DA7D16A6-E5F0-45B3-B194-C3FE64F1BFCD}
 	EndGlobalSection
 EndGlobal
