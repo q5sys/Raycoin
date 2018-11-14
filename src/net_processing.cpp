@@ -303,6 +303,9 @@ struct CNodeState {
 /** Map maintaining per-node state. */
 static std::map<NodeId, CNodeState> mapNodeState GUARDED_BY(cs_main);
 
+int g_netFirstBlockHeight = 0;
+int64_t g_netLastBlockTime = 0;
+
 static CNodeState *State(NodeId pnode) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
     std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(pnode);
     if (it == mapNodeState.end())
@@ -2596,6 +2599,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             ProcessNewBlock(chainparams, pblock, /*fForceProcessing=*/true, &fNewBlock);
             if (fNewBlock) {
                 pfrom->nLastBlockTime = GetTime();
+                LOCK(cs_main);
+                if (!g_netFirstBlockHeight) g_netFirstBlockHeight = chainActive.Height();
+                g_netLastBlockTime = pfrom->nLastBlockTime;
             } else {
                 LOCK(cs_main);
                 mapBlockSource.erase(pblock->GetHash());
@@ -2679,6 +2685,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             ProcessNewBlock(chainparams, pblock, /*fForceProcessing=*/true, &fNewBlock);
             if (fNewBlock) {
                 pfrom->nLastBlockTime = GetTime();
+                LOCK(cs_main);
+                if (!g_netFirstBlockHeight) g_netFirstBlockHeight = chainActive.Height();
+                g_netLastBlockTime = pfrom->nLastBlockTime;
             } else {
                 LOCK(cs_main);
                 mapBlockSource.erase(pblock->GetHash());
@@ -2734,6 +2743,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         ProcessNewBlock(chainparams, pblock, forceProcessing, &fNewBlock);
         if (fNewBlock) {
             pfrom->nLastBlockTime = GetTime();
+            LOCK(cs_main);
+            if (!g_netFirstBlockHeight) g_netFirstBlockHeight = chainActive.Height();
+            g_netLastBlockTime = pfrom->nLastBlockTime;
         } else {
             LOCK(cs_main);
             mapBlockSource.erase(pblock->GetHash());

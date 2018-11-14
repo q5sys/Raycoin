@@ -30,6 +30,9 @@
 #include <memory>
 #include <stdint.h>
 
+extern int g_netFirstBlockHeight;
+extern int64_t g_netLastBlockTime;
+
 unsigned int ParseConfirmTarget(const UniValue& value)
 {
     int target = value.get_int();

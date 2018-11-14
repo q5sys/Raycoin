@@ -395,7 +395,7 @@ void RaycoinViewer::start()
     }
     */
 
-    s_EnableVSync.Decrement();
+    s_EnableVSync = false;
     TargetResolution = kCustom;
     g_NativeWidthCustom = g_screenDim;
     g_NativeHeightCustom = g_screenDim;
@@ -1017,6 +1017,7 @@ void RaycoinViewer::Startup( void )
 
     EngineTuning::StartLoad(nullptr);
     _cameraHitLast = g_cameraHitCur;
+    _vsyncSave = s_EnableVSync;
 
     loadTraceLog();
     g_traceLogCur = (int)_traceLog.size();
@@ -1335,6 +1336,8 @@ void RaycoinViewer::Update(float deltaT)
             g_rayHitInsts = {};
             g_rayHitMap.clear();
             setCameraPreset(s_cameraPresets[CAMERAPRESET_ORIGIN]);
+            _vsyncSave = s_EnableVSync;
+            s_EnableVSync = false;
         }
         else if (_modeLast == MODE_COMPUTE)
         {
@@ -1349,6 +1352,8 @@ void RaycoinViewer::Update(float deltaT)
                 _cameraPresetSave = s_cameraPresets[g_cameraPresetCur];
             }
             setCameraPreset(_cameraPresetSave);
+
+            s_EnableVSync = _vsyncSave;
         }
         _modeLast = g_mode;
     }

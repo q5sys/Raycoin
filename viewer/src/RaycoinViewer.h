@@ -106,4 +106,5 @@ private:
     int             _modeLast;
     bool            _revertBestHash;
     bool            _resetAccelStruct;
+    bool            _vsyncSave;
 };
