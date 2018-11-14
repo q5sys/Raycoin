@@ -65,6 +65,7 @@ static bool AppInit(int argc, char* argv[])
 
     bool fRet = false;
 
+    GameCore::g_computeOnly = true;
 
 
     //
