@@ -1244,10 +1244,40 @@ void RaycoinViewer::Update(float deltaT)
                 HandleDigitalButtonPress(GameInput::kDPadRight, deltaT, [&]{ if (g_cameraPresetCur == CAMERAPRESET_HIT) g_cameraHitCur.Increment(); else _cameraHitLast = -1; });
             }
         }
-        HandleDigitalButtonPress(GameInput::kKey_up, deltaT, [&]{ g_traceLogCur.Increment(); if (!g_traceLogCur) g_traceLogCur = 1; });
-        HandleDigitalButtonPress(GameInput::kDPadUp, deltaT, [&]{ g_traceLogCur.Increment(); if (!g_traceLogCur) g_traceLogCur = 1; });
-        HandleDigitalButtonPress(GameInput::kKey_down, deltaT, [&]{ g_traceLogCur.Decrement(); if (!g_traceLogCur) g_traceLogCur = g_traceLogCur.GetMaxValue(); });
-        HandleDigitalButtonPress(GameInput::kDPadDown, deltaT, [&]{ g_traceLogCur.Decrement(); if (!g_traceLogCur) g_traceLogCur = g_traceLogCur.GetMaxValue(); });
+
+        if (!GameInput::IsPressed(GameInput::kKey_lshift) && !GameInput::IsPressed(GameInput::kKey_rshift) && !GameInput::IsPressed(GameInput::kAButton))
+        {
+            HandleDigitalButtonPress(GameInput::kKey_up, deltaT, [&]{ g_traceLogCur.Increment(); if (!g_traceLogCur) g_traceLogCur = 1; });
+            HandleDigitalButtonPress(GameInput::kDPadUp, deltaT, [&]{ g_traceLogCur.Increment(); if (!g_traceLogCur) g_traceLogCur = 1; });
+            HandleDigitalButtonPress(GameInput::kKey_down, deltaT, [&]{ g_traceLogCur.Decrement(); if (!g_traceLogCur) g_traceLogCur = g_traceLogCur.GetMaxValue(); });
+            HandleDigitalButtonPress(GameInput::kDPadDown, deltaT, [&]{ g_traceLogCur.Decrement(); if (!g_traceLogCur) g_traceLogCur = g_traceLogCur.GetMaxValue(); });
+        }
+        else
+        {
+            auto up = [&]
+            {
+                int count = 0, start = !g_traceLogCur ? 1 : g_traceLogCur;
+                do
+                {
+                    g_traceLogCur.Increment();
+                    if (!g_traceLogCur) g_traceLogCur = 1;
+                } while (g_traceLogCur && !_traceLog[g_traceLogCur-1].success && (!count++ || g_traceLogCur != start));
+            };
+            HandleDigitalButtonPress(GameInput::kKey_up, deltaT, up);
+            HandleDigitalButtonPress(GameInput::kDPadUp, deltaT, up);
+
+            auto down = [&]
+            {
+                int count = 0, start = !g_traceLogCur ? g_traceLogCur.GetMaxValue() : g_traceLogCur;
+                do
+                {
+                    g_traceLogCur.Decrement();
+                    if (!g_traceLogCur) g_traceLogCur = g_traceLogCur.GetMaxValue();
+                } while (g_traceLogCur && !_traceLog[g_traceLogCur-1].success && (!count++ || g_traceLogCur != start));
+            };
+            HandleDigitalButtonPress(GameInput::kKey_down, deltaT, down);
+            HandleDigitalButtonPress(GameInput::kDPadDown, deltaT, down);
+        }
     }    
 
     if (g_mode != MODE_COMPUTE)
@@ -1849,11 +1879,11 @@ void RaycoinViewer::RenderUI(class GraphicsContext& context)
         text.SetColor(_result.success ? color : hiColor);
         text.DrawFormattedString("\nResult:    %s", _result.success ?
                                     !g_traceLogCur ?    "Success! =) Press SPACEBAR to continue hashing or SHIFT-T to log this trace." :
-                                                        "Success! =) Press UP or DOWN to navigate your log." :
+                                                        "Success! =) Press UP or DOWN (+SHIFT) to navigate your log." :
                                     !g_traceLogCur ? g_mode != MODE_COMPUTE ?
                                                         "Fail... =( Press SPACEBAR to continue hashing." :
                                                         "Fail... =( Press SPACEBAR to stop hashing or < > to adjust difficulty." :
-                                                        "Fail... =( Press UP or DOWN to navigate your log.");
+                                                        "Fail... =( Press UP or DOWN (+SHIFT) to navigate your log.");
 
         text.SetColor(_result.success ? color : hiColor);
         if (_result.success)
@@ -1884,15 +1914,15 @@ void RaycoinViewer::RenderUI(class GraphicsContext& context)
         text.ResetCursor(0, (float)g_DisplayHeight - 80);
         text.SetColor(color);
         text.DrawString("Help:");
-        text.DrawString("\nMove: A W S D Q E +SHIFT");
+        text.DrawString("\nMove: A W S D Q E (+SHIFT)");
         text.DrawString("\nLook: Mouse");
         text.DrawString("\nZoom: + -");
-        text.DrawString("\nCameras: LEFT RIGHT +SHIFT");
+        text.DrawString("\nCameras: LEFT RIGHT (+SHIFT)");
         text.ResetCursor(256, (float)g_DisplayHeight - 80);
         text.DrawString("\nMode: Num 1-3 SPACEBAR");
         text.DrawString("\nDifficulty: < >");
         text.DrawString("\nLoad Log/Log Trace: T SHIFT-T");
-        text.DrawString("\nTrace Log #: UP DOWN");
+        text.DrawString("\nTrace Log #: UP DOWN (+SHIFT)");
         text.ResetCursor(512, (float)g_DisplayHeight - 80);
         text.DrawString("\nEngine Tuning: BACKSPACE");
         text.DrawString("\nHide Info/Labels/Help: I L H");
