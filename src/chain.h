@@ -407,7 +407,7 @@ public:
         READWRITE(nNonce);
     }
 
-    uint256 GetBlockHash() const
+    CBlockHeader GetBlockHeader() const
     {
         CBlockHeader block;
         block.nVersion        = nVersion;
@@ -416,7 +416,12 @@ public:
         block.nTime           = nTime;
         block.nBits           = nBits;
         block.nNonce          = nNonce;
-        return block.GetHash();
+        return block;
+    }
+
+    uint256 GetBlockHash() const
+    {
+        return GetBlockHeader().GetHash();
     }
 
 
