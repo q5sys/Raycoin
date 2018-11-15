@@ -118,7 +118,7 @@ UniValue generateBlocks(std::shared_ptr<CReserveScript> coinbaseScript, int nGen
         nHeight = chainActive.Height();
         nHeightEnd = nHeight+nGenerate;
     }
-    unsigned int nExtraNonce = 0;
+    unsigned int nExtraNonce = GetRand(std::numeric_limits<uint64_t>::max());
     UniValue blockHashes(UniValue::VARR);
     while (nHeight < nHeightEnd && !ShutdownRequested())
     {
