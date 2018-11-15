@@ -30,7 +30,9 @@
 #include "CompiledShaders/rayGenerationShader.h"
 #include "CompiledShaders/hitShader.h"
 #include "CompiledShaders/missShader.h"
-#include "CompiledShaders/lineHitShader.h"
+#ifndef COMPUTE_ONLY
+    #include "CompiledShaders/lineHitShader.h"
+#endif
 #include "CompiledShaders/initFieldCS.h"
 
 #include "D3D12RaytracingFallback.h"
@@ -52,6 +54,7 @@ static const string g_traceLogFile = "raytraces.log";
 
 CComPtr<ID3D12RaytracingFallbackDevice> g_pRaytracingDevice;
 
+HitShaderConstants          g_hitShaderConstants;
 ByteAddressBuffer           g_hitShaderConstantBuffer;
 ByteAddressBuffer           g_initFieldConstantBuffer;
 
@@ -357,53 +360,6 @@ int wmain(int argc, const WCHAR* argv[])
 
 void RaycoinViewer::start()
 {
-#if _DEBUG
-    CComPtr<ID3D12Debug> debugInterface;
-    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface))))
-    {
-        debugInterface->EnableDebugLayer();
-    }
-#endif
-    /*
-    // Before starting the app, go through the D3D12 experimental features and turn on
-    // Raytracing support to see if any devices that support it exist. If not, try 
-    // experimental shader models to increase the chance that the driver is compatible 
-    // with the Raytacing Fallback Layer
-    UUID experimentalShadersFeatures[] = { D3D12ExperimentalShaderModels };
-    struct Experiment { UUID *Experiments; UINT numFeatures; };
-    Experiment experiments[] = {
-        { experimentalShadersFeatures, ARRAYSIZE(experimentalShadersFeatures) },
-        { nullptr, 0 },
-    };
-
-    CComPtr<ID3D12Device> pDevice;
-    CComPtr<IDXGIAdapter1> pAdapter;
-    CComPtr<IDXGIFactory2> pFactory;
-    CreateDXGIFactory2(0, IID_PPV_ARGS(&pFactory));
-    bool validDeviceFound = false;
-    for (auto &experiment : experiments)
-    {
-        if (SUCCEEDED(D3D12EnableExperimentalFeatures(experiment.numFeatures, experiment.Experiments, nullptr, nullptr)))
-        {
-            int gpuSelect = Graphics::g_gpuSelect;
-            for (uint32_t Idx = 0; DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters1(Idx, &pAdapter); ++Idx)
-            {
-                DXGI_ADAPTER_DESC1 desc;
-                pAdapter->GetDesc1(&desc);
-                if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) continue;
-                if (gpuSelect-- > 0) continue;
-
-                if (SUCCEEDED(D3D12CreateDevice(pAdapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&pDevice))))
-                {
-                    validDeviceFound = true;
-                    break;
-                }
-            }
-            if (validDeviceFound) break;
-        }
-    }
-    */
-
     TargetResolution = kCustom;
     g_NativeWidthCustom = g_screenDim;
     g_NativeHeightCustom = g_screenDim;
@@ -669,7 +625,12 @@ void InitializeRaytracingStateObjects()
     g_offsetToMaterialConstants = ALIGN(sizeof(UINT32), shaderIdentifierSize);
     g_shaderRecordSizeInBytes = ALIGN(D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT, g_offsetToMaterialConstants + sizeof(MaterialRootConstants));
     
-    vector<byte> pHitShaderTable(g_shaderRecordSizeInBytes * (g_sphereCount + 1));
+#ifndef COMPUTE_ONLY
+    bool hasLine = true;
+#else
+    bool hasLine = false;
+#endif
+    vector<byte> pHitShaderTable(g_shaderRecordSizeInBytes * (g_sphereCount + hasLine));
     auto GetShaderTable = [=](ID3D12RaytracingFallbackStateObject *pPSO, byte *pShaderTable)
     {
         void *pHitGroupIdentifierData = pPSO->GetShaderIdentifier(hitGroupExportNames[0]);
@@ -1001,6 +962,7 @@ void RaycoinViewer::Startup( void )
     g_lineMesh = make_cylinder(1,1,1,g_lineMeshLOD);
     g_arrowHeadMesh = make_cylinder(1,1,0,g_lineMeshLOD);
 #endif
+    g_hitShaderConstants.resolution = { g_screenDim, g_screenDim };
     g_hitShaderConstantBuffer.Create(L"Hit Constant Buffer", 1, sizeof(HitShaderConstants));
     g_initFieldConstantBuffer.Create(L"Init Field Constant Buffer", 1, sizeof(InitFieldConstants));
 
@@ -1023,7 +985,6 @@ void RaycoinViewer::Startup( void )
 
     _camera.SetPerspectiveMatrix(g_fov * XM_PI / 180, 1, g_zRange[0], g_zRange[1]);
     _camera.SetEyeAtUp(Vector3(kZero), Vector3(kZero), Vector3(kYUnitVector));
-    
     s_cameraPresets[CAMERAPRESET_ORIGIN] = { Vector3(kZero), 0.f, 0.f };
     s_cameraPresets[CAMERAPRESET_RIGHT] = { Vector3(g_sphereDim/2 * 4 * 1.5f, 0, 0), XM_PIDIV2, 0 };
     s_cameraPresets[CAMERAPRESET_TOP] = { Vector3(0, s_cameraPresets[CAMERAPRESET_RIGHT].pos[0], 0), 0, -XM_PIDIV2 };
@@ -1034,15 +995,21 @@ void RaycoinViewer::Startup( void )
         XM_PIDIV4, -XM_PIDIV4
     };
     s_cameraPresets[CAMERAPRESET_HIT] = s_cameraPresets[CAMERAPRESET_ORIGIN];
-
     _cameraController.reset(new CameraController(_camera, Vector3(kYUnitVector)));
 #ifndef RELEASE
     _cameraController->SlowRotation(true);
 #endif
     _cameraPresetLast = -1;
     _cameraPresetSave = {};
+    setCameraPreset(s_cameraPresets[CAMERAPRESET_ORIGIN]);
+#ifdef COMPUTE_ONLY
+    auto mat = Transpose(Invert(_camera.GetViewProjMatrix()));
+    memcpy(&g_hitShaderConstants.cameraToWorld, &mat, sizeof(g_hitShaderConstants.cameraToWorld));
+    g_hitShaderConstants.worldCameraPosition = _camera.GetPosition();
+#endif
 
     _result = {};
+    resetBestHash();
     g_traceResult = {};
     _bestHash = true;
     _blockHeight = 0;
@@ -1224,7 +1191,9 @@ void RaycoinViewer::buildAccelStruct()
 void RaycoinViewer::Cleanup( void )
 {
     if (!hasAdapter()) return;
+#ifndef COMPUTE_ONLY
     EngineTuning::StartSave(nullptr);
+#endif
 }
 
 void HandleDigitalButtonPress(GameInput::DigitalInput button, float timeDelta, function<void()> action);
@@ -1496,7 +1465,7 @@ void RaycoinViewer::RenderScene(void)
         context.Dispatch();
         context.InsertUAVBarrier(hitShaderTable);
         context.InsertUAVBarrier(g_instanceDescsBuffer);
-
+#ifndef COMPUTE_ONLY
         if (g_instanceDescs) g_instanceDescsRead.Unmap();
         context.CopyBuffer(g_instanceDescsRead, g_instanceDescsBuffer);
         if (g_hitShaderTable) hitShaderTableRead.Unmap();
@@ -1504,6 +1473,9 @@ void RaycoinViewer::RenderScene(void)
         context.Finish(true);
         g_instanceDescs = static_cast<D3D12_RAYTRACING_FALLBACK_INSTANCE_DESC*>(g_instanceDescsRead.Map());
         g_hitShaderTable = static_cast<byte*>(hitShaderTableRead.Map());
+#else
+        context.Finish();
+#endif
     }
 
     if (g_mode == MODE_COMPUTE)
@@ -1541,10 +1513,10 @@ void RaycoinViewer::RenderScene(void)
         CComPtr<ID3D12RaytracingFallbackCommandList> pRaytracingCommandList;
         g_pRaytracingDevice->QueryRaytracingCommandList(pCommandList, IID_PPV_ARGS(&pRaytracingCommandList));
 
-        HitShaderConstants inputs;
-        auto m0 = _camera.GetViewProjMatrix();
-        auto m1 = Transpose(Invert(m0));
-        memcpy(&inputs.cameraToWorld, &m1, sizeof(inputs.cameraToWorld));
+        HitShaderConstants inputs = g_hitShaderConstants;
+#ifndef COMPUTE_ONLY
+        auto mat = Transpose(Invert(_camera.GetViewProjMatrix()));
+        memcpy(&inputs.cameraToWorld, &mat, sizeof(inputs.cameraToWorld));
         inputs.worldCameraPosition = _camera.GetPosition();
         inputs.bgColor = { g_bgColor_r, g_bgColor_g, g_bgColor_b };
         inputs.diffuseColor = {g_diffuseColor_r, g_diffuseColor_g, g_diffuseColor_b};
@@ -1556,9 +1528,10 @@ void RaycoinViewer::RenderScene(void)
                                                     Vector3(g_rayFailColorMid_r, g_rayFailColorMid_g, g_rayFailColorMid_b);
         inputs.rayColorEnd = _result.success ?      Vector3(g_rayColorEnd_r, g_rayColorEnd_g, g_rayColorEnd_b) :
                                                     Vector3(g_rayFailColorEnd_r, g_rayFailColorEnd_g, g_rayFailColorEnd_b);
+#endif
         memcpy(inputs.targetHash, _target.data(), sizeof(_target));
         inputs.verifyPos = { _verifyPos.x, _verifyPos.y };
-        inputs.resolution = { g_screenDim, g_screenDim };
+#ifndef COMPUTE_ONLY
         inputs.diffuse = g_diffuse;
         inputs.gloss = g_gloss;
         inputs.specular = g_specular;
@@ -1573,14 +1546,15 @@ void RaycoinViewer::RenderScene(void)
         inputs.trace = g_mode != MODE_DIFFUSE;
         inputs.compute = g_mode == MODE_COMPUTE;
         inputs.hashing = g_hashing;
+#endif
         inputs.bestHash = _bestHash;
-
+#ifndef COMPUTE_ONLY
         float costheta = cosf(g_sunOrientation);
         float sintheta = sinf(g_sunOrientation);
         float cosphi = cosf(g_sunInclination * 3.14159f * 0.5f);
         float sinphi = sinf(g_sunInclination * 3.14159f * 0.5f);
         inputs.sunDirection = Normalize(Vector3(costheta * cosphi, sinphi, sintheta * cosphi));
-
+#endif
         context.WriteBuffer(g_hitShaderConstantBuffer, 0, &inputs, sizeof(inputs));
         context.TransitionResource(g_hitShaderConstantBuffer, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
@@ -1588,19 +1562,24 @@ void RaycoinViewer::RenderScene(void)
         memcpy(traceResult[0].hash, _result.hash.data(), sizeof(_result.hash));
         context.WriteBuffer(g_traceResultBuffer, 0, &traceResult, sizeof(traceResult));
         context.TransitionResource(g_traceResultBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-
+#ifndef COMPUTE_ONLY
         context.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+#endif
         context.FlushResourceBarriers();
 
         ID3D12DescriptorHeap *pDescriptorHeaps[] = { &g_pRaytracingDescriptorHeap->GetDescriptorHeap() };
         pRaytracingCommandList->SetDescriptorHeaps(ARRAYSIZE(pDescriptorHeaps), pDescriptorHeaps);
 
         pCommandList->SetComputeRootSignature(g_GlobalRaytracingRootSignature);
+#ifndef COMPUTE_ONLY
         pCommandList->SetComputeRootDescriptorTable(0, g_OutputUAV);
+#endif
         pRaytracingCommandList->SetTopLevelAccelerationStructure(1, g_topLevelAccelPointer);
         pCommandList->SetComputeRootConstantBufferView(2, g_hitShaderConstantBuffer.GetGpuVirtualAddress());
         pCommandList->SetComputeRootShaderResourceView(3, g_attribBuffer.GetGpuVirtualAddress());
+#ifndef COMPUTE_ONLY
         pCommandList->SetComputeRootShaderResourceView(4, g_lineAttribBuffer.GetGpuVirtualAddress());
+#endif
         pCommandList->SetComputeRootUnorderedAccessView(5, g_traceResultBuffer.GetGpuVirtualAddress());
 
         int dispatchDim = _verifyPos.x < 0 ? g_screenDim : 1;
@@ -1626,24 +1605,30 @@ void RaycoinViewer::RenderScene(void)
                 _result.pos = { traceResult.pos.x, traceResult.pos.y };
                 _result.depth = traceResult.depth;
                 _result.timestamp = g_traceLogCur ? _traceLog[g_traceLogCur-1].timestamp : chrono::system_clock::now();
+#ifndef COMPUTE_ONLY
                 g_traceResult = traceResult;
+#endif
             }
+#ifndef COMPUTE_ONLY
             if (traceResult.success || g_traceLogCur || _revertBestHash)
             {
                 g_mode = MODE_DIFFUSE_REFLECT;
                 _revertBestHash = false;
             }
+#endif
             g_traceResultRead.Unmap();   
         }
         else
             context.Finish();
-
+#ifndef COMPUTE_ONLY
         if (_verifyPos.x >= 0) Graphics::g_skipPresent = 1;
+#endif
     }
 }
 
 void RaycoinViewer::buildPath()
 {
+#ifndef COMPUTE_ONLY
     vector<Vertex> verts;
     vector<Triangle> indices;
     vector<LineAttrib> attribs;
@@ -1818,10 +1803,12 @@ void RaycoinViewer::buildPath()
     }
     buildAccelStruct();
     _resetAccelStruct = true;
+#endif
 }
 
 void RaycoinViewer::RenderUI(class GraphicsContext& context)
 {
+#ifndef COMPUTE_ONLY
     const Color color = TextRenderer::g_color;
     const Color hiColor = TextRenderer::g_hiColor;
 
@@ -1989,6 +1976,7 @@ void RaycoinViewer::RenderUI(class GraphicsContext& context)
         text.DrawString("\nExit: R-Click ESCAPE");
     }
     text.End();
+#endif
 }
 
 RaycoinViewer::TraceResult RaycoinViewer::loadTrace(const UniValue& val)

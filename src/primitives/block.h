@@ -61,6 +61,7 @@ public:
     }
 
     uint256 GetHash() const;
+    std::pair<bool, uint256> GetHash(bool verify) const;
 
     int64_t GetBlockTime() const
     {

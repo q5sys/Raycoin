@@ -621,7 +621,7 @@ void Graphics::Terminate( void )
     if (!g_Device) return;
     g_CommandManager.IdleGPU();
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
-    s_SwapChain1->SetFullscreenState(FALSE, nullptr);
+    if (!GameCore::g_computeOnly) s_SwapChain1->SetFullscreenState(FALSE, nullptr);
 #endif
 }
 
@@ -632,25 +632,28 @@ void Graphics::Shutdown( void )
     CommandContext::DestroyAllContexts();
     g_CommandManager.Shutdown();
     GpuTimeManager::Shutdown();
-    s_SwapChain1->Release();
+    if (!GameCore::g_computeOnly) s_SwapChain1->Release();
     PSO::DestroyAll();
     RootSignature::DestroyAll();
     DescriptorAllocator::DestroyAll();
 
-    DestroyCommonState();
-    DestroyRenderingBuffers();
-    TemporalEffects::Shutdown();
-    PostEffects::Shutdown();
-    SSAO::Shutdown();
-    TextRenderer::Shutdown();
-    GraphRenderer::Shutdown();
-    ParticleEffects::Shutdown();
-    TextureManager::Shutdown();
+    if (!GameCore::g_computeOnly)
+    {
+        DestroyCommonState();
+        DestroyRenderingBuffers();
+        TemporalEffects::Shutdown();
+        PostEffects::Shutdown();
+        SSAO::Shutdown();
+        TextRenderer::Shutdown();
+        GraphRenderer::Shutdown();
+        ParticleEffects::Shutdown();
+        TextureManager::Shutdown();
 
-    for (UINT i = 0; i < SWAP_CHAIN_BUFFER_COUNT; ++i)
-        g_DisplayPlane[i].Destroy();
+        for (UINT i = 0; i < SWAP_CHAIN_BUFFER_COUNT; ++i)
+            g_DisplayPlane[i].Destroy();
 
-    g_PreDisplayBuffer.Destroy();
+        g_PreDisplayBuffer.Destroy();
+    }
 
 #if defined(_DEBUG)
     ID3D12DebugDevice* debugInterface;

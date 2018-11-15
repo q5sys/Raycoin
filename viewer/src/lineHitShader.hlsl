@@ -5,7 +5,6 @@
 #define HLSL
 #include "RaycoinViewerRaytracing.h"
 
-#ifndef COMPUTE_ONLY
 [shader("closesthit")]
 void LineHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
@@ -25,4 +24,3 @@ void LineHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes 
     float3 outputColor = payload.diffuseColor;
     g_screenOutput[DispatchRaysIndex().xy] = float4(outputColor, 1);
 }
-#endif

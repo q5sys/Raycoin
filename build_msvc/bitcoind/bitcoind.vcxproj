@@ -83,9 +83,9 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level2</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;HAVE_CONFIG_H;_SCL_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;HAVE_CONFIG_H;_SCL_SECURE_NO_WARNINGS;COMPUTE_ONLY;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\..\src;..\..\src\univalue\include;..\..\viewer\src;..\..\viewer\MiniEngine\Core</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -142,11 +142,11 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level2</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;HAVE_CONFIG_H;_SCL_SECURE_NO_WARNINGS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;HAVE_CONFIG_H;_SCL_SECURE_NO_WARNINGS;COMPUTE_ONLY;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\..\src;..\..\src\univalue\include;..\..\viewer\src;..\..\viewer\MiniEngine\Core</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -166,6 +166,15 @@
     <ClCompile Include="..\..\src\bitcoind.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\viewer\Libraries\BLAKE2\src\win\blake2.vcxproj">
+      <Project>{faa26500-af2e-4c27-b7eb-03baae424a5a}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\viewer\Libraries\D3D12RaytracingFallback\src\FallbackLayer.vcxproj">
+      <Project>{4be280a6-1066-41ca-acdd-6bb7e532508b}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\viewer\MiniEngine\Core\Core_VS15.vcxproj">
+      <Project>{86a58508-0d6a-4786-a32f-01a301fdc6f3}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\..\viewer\src\RaycoinViewer_lib.vcxproj">
       <Project>{c2ed4c4c-b92c-4e42-910d-0073de87c019}</Project>
     </ProjectReference>

@@ -5,7 +5,6 @@
     <FxCompile Include="hitShader.hlsl" />
     <FxCompile Include="missShader.hlsl" />
     <FxCompile Include="RayGenerationShader.hlsl" />
-    <FxCompile Include="lineHitShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RaycoinViewer.h" />

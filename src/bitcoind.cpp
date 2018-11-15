@@ -65,8 +65,6 @@ static bool AppInit(int argc, char* argv[])
 
     bool fRet = false;
 
-    RaycoinViewer::inst.start(true);
-
     //
     // Parameters
     //
@@ -128,6 +126,19 @@ static bool AppInit(int argc, char* argv[])
         // Set this early so that parameter interactions go to console
         InitLogging();
         InitParameterInteraction();
+
+        using Args = const WCHAR*[];
+        auto wstring = [](std::string& s){ return std::wstring(s.begin(), s.end()); };
+        RaycoinViewer::inst.parseCommandLineArgs(Args{L"", L"-gpu", wstring(gArgs.GetArg("-gpu", "0")).c_str()}, 3);
+        RaycoinViewer::inst.parseCommandLineArgs(Args{L"", L"-datadir", GetDataDir(false).c_str()}, 3);
+        RaycoinViewer::inst.start();
+        if (!RaycoinViewer::inst.hasAdapter()) return false;
+        if (Params().GenesisBlock().GetHash() != Params().GetConsensus().hashGenesisBlock)
+        {
+            fprintf(stderr, "Error: Failed to reproduce the genesis hash with the selected GPU.\n");
+            return false;
+        }
+
         if (!AppInitBasicSetup())
         {
             // InitError will have been called with detailed error, which ends up on console
@@ -172,11 +183,6 @@ static bool AppInit(int argc, char* argv[])
             return false;
         }
         fRet = AppInitMain(interfaces);
-
-        using Args = const WCHAR*[];
-        auto wstring = [](std::string& s){ return std::wstring(s.begin(), s.end()); };
-        RaycoinViewer::inst.parseCommandLineArgs(Args{L"", L"-gpu", wstring(gArgs.GetArg("-gpu", "0")).c_str()}, 3);
-        RaycoinViewer::inst.parseCommandLineArgs(Args{L"", L"-datadir", GetDataDir(false).c_str()}, 3);
     }
     catch (const std::exception& e) {
         PrintExceptionContinue(&e, "AppInit()");

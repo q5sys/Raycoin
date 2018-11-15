@@ -58,14 +58,15 @@ public:
     virtual void RenderUI(class GraphicsContext&) override;
 
     bool hasAdapter() const;
+    bool bestHash() const                       { return _bestHash; }
     void bestHash(bool enable)                  { _bestHash = enable; }
     void resetBestHash()                        { _result.hash.fill(~0); } 
     void blockInfo(int blockHeight, UINT blockNonce, UINT blockExtraNonce) { _blockHeight = blockHeight; _blockNonce = blockNonce; _blockExtraNonce = blockExtraNonce; }
     void seed(const Hash& seed)                 { _seed = seed; }
-    void targetHash(const Hash& target)         { _target = target; }
+    void target(const Hash& target)             { _target = target; }
     void verifyPos(const ScreenCoord& pos)      { _verifyPos = pos; }
     
-    const TraceResult& traceResult() const      { return _result; }
+    TraceResult& traceResult()                  { return _result; }
     float tracePerSec() const                   { return _tracePerSec; }
 
     TraceResult loadTrace(const UniValue& val);

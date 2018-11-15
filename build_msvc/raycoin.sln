@@ -33,6 +33,12 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "raycoin-cli", "bitcoin-cli\bitcoin-cli.vcxproj", "{0B2D7431-F876-4A58-87BF-F748338CD3BF}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "raycoin-tx", "bitcoin-tx\bitcoin-tx.vcxproj", "{D3022AF6-AD33-4CE3-B358-87CB6A1B29CF}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FAA26500-AF2E-4C27-B7EB-03BAAE424A5A} = {FAA26500-AF2E-4C27-B7EB-03BAAE424A5A}
+		{86A58508-0D6A-4786-A32F-01A301FDC6F3} = {86A58508-0D6A-4786-A32F-01A301FDC6F3}
+		{C2ED4C4C-B92C-4E42-910D-0073DE87C019} = {C2ED4C4C-B92C-4E42-910D-0073DE87C019}
+		{4BE280A6-1066-41CA-ACDD-6BB7E532508B} = {4BE280A6-1066-41CA-ACDD-6BB7E532508B}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libminiupnpc-static", "miniupnpc\libminiupnpc-static.vcxproj", "{0F7DAFC8-290E-38CE-A643-558A22E9D088}"
 EndProject
@@ -409,10 +415,10 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		        SolutionGuid = {DA7D16A6-E5F0-45B3-B194-C3FE64F1BFCD}
-		                                SolutionGuid = {D0CAE2D0-8DB1-4A0B-80EE-800AA6C64323}
-		                        SolutionGuid = {2FB733C9-24CB-4BA5-A26B-F43DAD7996B7}
-		                SolutionGuid = {4ABD1207-9A90-4EC9-A8EB-203638A2605D}
 		SolutionGuid = {26F77E38-08EC-4902-8C15-2DFA12C7C81C}
+		                SolutionGuid = {4ABD1207-9A90-4EC9-A8EB-203638A2605D}
+		                        SolutionGuid = {2FB733C9-24CB-4BA5-A26B-F43DAD7996B7}
+		                                SolutionGuid = {D0CAE2D0-8DB1-4A0B-80EE-800AA6C64323}
+		        SolutionGuid = {DA7D16A6-E5F0-45B3-B194-C3FE64F1BFCD}
 	EndGlobalSection
 EndGlobal

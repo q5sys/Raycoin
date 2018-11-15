@@ -103,13 +103,14 @@ trace(RayPayload initPayload)
     float depthSqrMax = 0;
     float3 pos = WorldRayOrigin();
     float3 dir = WorldRayDirection();
+    int p;
 #ifndef COMPUTE_ONLY
     int pathMax = g.compute ? g_pathMax : g.shadePathMax;
+    bool endTrace = false;
+    for (p = 0; p < pathMax && hit < g_hitCount && !endTrace; ++p)
 #else
-    int pathMax = g_pathMax;
+    for (p = 0; p < g_pathMax && hit < g_hitCount; ++p)
 #endif
-    int p;
-    for (p = 0; p < pathMax && hit < g_hitCount; ++p)
     {
         RayPayload payload;
         if (p)
@@ -130,7 +131,6 @@ trace(RayPayload initPayload)
         path[p].instId = payload.instId;
         path[p].diffuseColor = payload.diffuseColor;
         path[p].emissiveColor = payload.emissiveColor;
-        bool endTrace = false;
 #endif
         switch (payload.instId)
         {
@@ -167,9 +167,6 @@ trace(RayPayload initPayload)
             break;
         }
         }
-#ifndef COMPUTE_ONLY
-        if (endTrace) { ++p; break; }
-#endif
     }
 
 #ifndef COMPUTE_ONLY
