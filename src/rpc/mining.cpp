@@ -30,6 +30,7 @@
 #include <memory>
 #include <stdint.h>
 
+extern CCriticalSection cs_hash;
 extern int g_netFirstBlockHeight;
 extern int64_t g_netLastBlockTime;
 
