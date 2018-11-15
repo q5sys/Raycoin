@@ -10,6 +10,7 @@ void Hit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr
 {
     payload.rayT = RayTCurrent();
     payload.prim = PrimitiveIndex();
+#ifndef COMPUTE_ONLY
     payload.diffuseColor = g_mat.diffuseColor*g.diffuseColor;
 
     payload.emissiveColor = 0;
@@ -34,11 +35,12 @@ void Hit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr
             payload.emissiveColor += payload.diffuseColor*intensity/2 + rayColor*intensity/2;
         }
     }
-
+#endif
     payload.label = g_mat.label;
     payload.instId = InstanceID();
     if (payload.reflection) return;
 
+#ifndef COMPUTE_ONLY
     float3 outputColor;
     if (g.trace)
         outputColor = trace(payload);
@@ -51,4 +53,7 @@ void Hit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr
                         float3(0,0,0), 0);
     }
     g_screenOutput[DispatchRaysIndex().xy] = float4(outputColor, 1);
+#else
+    trace(payload);
+#endif
 }

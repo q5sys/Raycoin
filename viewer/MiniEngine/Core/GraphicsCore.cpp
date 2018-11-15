@@ -84,6 +84,7 @@ namespace GameCore
 #else
     extern Platform::Agile<Windows::UI::Core::CoreWindow>  g_window;
 #endif
+    extern bool g_computeOnly;
 }
 
 namespace
@@ -179,7 +180,7 @@ namespace Graphics
 
         g_CommandManager.IdleGPU();
 
-        InitializeRenderingBuffers(NativeWidth, NativeHeight);
+        if (!GameCore::g_computeOnly) InitializeRenderingBuffers(NativeWidth, NativeHeight);
     }
 
     ID3D12Device* g_Device = nullptr;
@@ -476,136 +477,143 @@ void Graphics::Initialize(void)
 
     g_CommandManager.Create(g_Device);
 
-    DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-    swapChainDesc.Width = g_DisplayWidth;
-    swapChainDesc.Height = g_DisplayHeight;
-    swapChainDesc.Format = SwapChainFormat;
-    swapChainDesc.Scaling = DXGI_SCALING_NONE;
-    swapChainDesc.SampleDesc.Quality = 0;
-    swapChainDesc.SampleDesc.Count = 1;
-    swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    swapChainDesc.BufferCount = SWAP_CHAIN_BUFFER_COUNT;
-    swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
-
-#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP) // Win32
-    ASSERT_SUCCEEDED(dxgiFactory->CreateSwapChainForHwnd(g_CommandManager.GetCommandQueue(), GameCore::g_hWnd, &swapChainDesc, nullptr, nullptr, &s_SwapChain1));
-#else // UWP
-    ASSERT_SUCCEEDED(dxgiFactory->CreateSwapChainForCoreWindow(g_CommandManager.GetCommandQueue(), (IUnknown*)GameCore::g_window.Get(), &swapChainDesc, nullptr, &s_SwapChain1));
-#endif
-
-#if CONDITIONALLY_ENABLE_HDR_OUTPUT && defined(NTDDI_WIN10_RS2) && (NTDDI_VERSION >= NTDDI_WIN10_RS2)
+    if (!GameCore::g_computeOnly)
     {
-        IDXGISwapChain4* swapChain = (IDXGISwapChain4*)s_SwapChain1;
-        ComPtr<IDXGIOutput> output;
-        ComPtr<IDXGIOutput6> output6;
-        DXGI_OUTPUT_DESC1 outputDesc;
-        UINT colorSpaceSupport;
+        DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
+        swapChainDesc.Width = g_DisplayWidth;
+        swapChainDesc.Height = g_DisplayHeight;
+        swapChainDesc.Format = SwapChainFormat;
+        swapChainDesc.Scaling = DXGI_SCALING_NONE;
+        swapChainDesc.SampleDesc.Quality = 0;
+        swapChainDesc.SampleDesc.Count = 1;
+        swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        swapChainDesc.BufferCount = SWAP_CHAIN_BUFFER_COUNT;
+        swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
 
-        // Query support for ST.2084 on the display and set the color space accordingly
-        if (SUCCEEDED(swapChain->GetContainingOutput(&output)) &&
-            SUCCEEDED(output.As(&output6)) &&
-            SUCCEEDED(output6->GetDesc1(&outputDesc)) &&
-            outputDesc.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 &&
-            SUCCEEDED(swapChain->CheckColorSpaceSupport(DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020, &colorSpaceSupport)) &&
-            (colorSpaceSupport & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT) &&
-            SUCCEEDED(swapChain->SetColorSpace1(DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020)))
+    #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP) // Win32
+        ASSERT_SUCCEEDED(dxgiFactory->CreateSwapChainForHwnd(g_CommandManager.GetCommandQueue(), GameCore::g_hWnd, &swapChainDesc, nullptr, nullptr, &s_SwapChain1));
+    #else // UWP
+        ASSERT_SUCCEEDED(dxgiFactory->CreateSwapChainForCoreWindow(g_CommandManager.GetCommandQueue(), (IUnknown*)GameCore::g_window.Get(), &swapChainDesc, nullptr, &s_SwapChain1));
+    #endif
+
+    #if CONDITIONALLY_ENABLE_HDR_OUTPUT && defined(NTDDI_WIN10_RS2) && (NTDDI_VERSION >= NTDDI_WIN10_RS2)
         {
-            g_bEnableHDROutput = true;
+            IDXGISwapChain4* swapChain = (IDXGISwapChain4*)s_SwapChain1;
+            ComPtr<IDXGIOutput> output;
+            ComPtr<IDXGIOutput6> output6;
+            DXGI_OUTPUT_DESC1 outputDesc;
+            UINT colorSpaceSupport;
+
+            // Query support for ST.2084 on the display and set the color space accordingly
+            if (SUCCEEDED(swapChain->GetContainingOutput(&output)) &&
+                SUCCEEDED(output.As(&output6)) &&
+                SUCCEEDED(output6->GetDesc1(&outputDesc)) &&
+                outputDesc.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 &&
+                SUCCEEDED(swapChain->CheckColorSpaceSupport(DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020, &colorSpaceSupport)) &&
+                (colorSpaceSupport & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT) &&
+                SUCCEEDED(swapChain->SetColorSpace1(DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020)))
+            {
+                g_bEnableHDROutput = true;
+            }
         }
-    }
-#endif
+    #endif
 
-    for (uint32_t i = 0; i < SWAP_CHAIN_BUFFER_COUNT; ++i)
-    {
-        ComPtr<ID3D12Resource> DisplayPlane;
-        ASSERT_SUCCEEDED(s_SwapChain1->GetBuffer(i, MY_IID_PPV_ARGS(&DisplayPlane)));
-        g_DisplayPlane[i].CreateFromSwapChain(L"Primary SwapChain Buffer", DisplayPlane.Detach());
-    }
+        for (uint32_t i = 0; i < SWAP_CHAIN_BUFFER_COUNT; ++i)
+        {
+            ComPtr<ID3D12Resource> DisplayPlane;
+            ASSERT_SUCCEEDED(s_SwapChain1->GetBuffer(i, MY_IID_PPV_ARGS(&DisplayPlane)));
+            g_DisplayPlane[i].CreateFromSwapChain(L"Primary SwapChain Buffer", DisplayPlane.Detach());
+        }
 
-    // Common state was moved to GraphicsCommon.*
-    InitializeCommonState();
+        // Common state was moved to GraphicsCommon.*
+        InitializeCommonState();
 
-    s_PresentRS.Reset(4, 2);
-    s_PresentRS[0].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 2);
-    s_PresentRS[1].InitAsConstants(0, 6, D3D12_SHADER_VISIBILITY_ALL);
-    s_PresentRS[2].InitAsBufferSRV(2, D3D12_SHADER_VISIBILITY_PIXEL);
-    s_PresentRS[3].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
-    s_PresentRS.InitStaticSampler(0, SamplerLinearClampDesc);
-    s_PresentRS.InitStaticSampler(1, SamplerPointClampDesc);
-    s_PresentRS.Finalize(L"Present");
+        s_PresentRS.Reset(4, 2);
+        s_PresentRS[0].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 2);
+        s_PresentRS[1].InitAsConstants(0, 6, D3D12_SHADER_VISIBILITY_ALL);
+        s_PresentRS[2].InitAsBufferSRV(2, D3D12_SHADER_VISIBILITY_PIXEL);
+        s_PresentRS[3].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
+        s_PresentRS.InitStaticSampler(0, SamplerLinearClampDesc);
+        s_PresentRS.InitStaticSampler(1, SamplerPointClampDesc);
+        s_PresentRS.Finalize(L"Present");
 
-    // Initialize PSOs
-    s_BlendUIPSO.SetRootSignature(s_PresentRS);
-    s_BlendUIPSO.SetRasterizerState( RasterizerTwoSided );
-    s_BlendUIPSO.SetBlendState( BlendPreMultiplied );
-    s_BlendUIPSO.SetDepthStencilState( DepthStateDisabled );
-    s_BlendUIPSO.SetSampleMask(0xFFFFFFFF);
-    s_BlendUIPSO.SetInputLayout(0, nullptr);
-    s_BlendUIPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-    s_BlendUIPSO.SetVertexShader( g_pScreenQuadVS, sizeof(g_pScreenQuadVS) );
-    s_BlendUIPSO.SetPixelShader( g_pBufferCopyPS, sizeof(g_pBufferCopyPS) );
-    s_BlendUIPSO.SetRenderTargetFormat(SwapChainFormat, DXGI_FORMAT_UNKNOWN);
-    s_BlendUIPSO.Finalize();
+        // Initialize PSOs
+        s_BlendUIPSO.SetRootSignature(s_PresentRS);
+        s_BlendUIPSO.SetRasterizerState( RasterizerTwoSided );
+        s_BlendUIPSO.SetBlendState( BlendPreMultiplied );
+        s_BlendUIPSO.SetDepthStencilState( DepthStateDisabled );
+        s_BlendUIPSO.SetSampleMask(0xFFFFFFFF);
+        s_BlendUIPSO.SetInputLayout(0, nullptr);
+        s_BlendUIPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+        s_BlendUIPSO.SetVertexShader( g_pScreenQuadVS, sizeof(g_pScreenQuadVS) );
+        s_BlendUIPSO.SetPixelShader( g_pBufferCopyPS, sizeof(g_pBufferCopyPS) );
+        s_BlendUIPSO.SetRenderTargetFormat(SwapChainFormat, DXGI_FORMAT_UNKNOWN);
+        s_BlendUIPSO.Finalize();
 
-#define CreatePSO( ObjName, ShaderByteCode ) \
-    ObjName = s_BlendUIPSO; \
-    ObjName.SetBlendState( BlendDisable ); \
-    ObjName.SetPixelShader(ShaderByteCode, sizeof(ShaderByteCode) ); \
-    ObjName.Finalize();
+    #define CreatePSO( ObjName, ShaderByteCode ) \
+        ObjName = s_BlendUIPSO; \
+        ObjName.SetBlendState( BlendDisable ); \
+        ObjName.SetPixelShader(ShaderByteCode, sizeof(ShaderByteCode) ); \
+        ObjName.Finalize();
 
-    CreatePSO(PresentSDRPS, g_pPresentSDRPS);
-    CreatePSO(MagnifyPixelsPS, g_pMagnifyPixelsPS);
-    CreatePSO(BilinearUpsamplePS, g_pBilinearUpsamplePS);
-    CreatePSO(BicubicHorizontalUpsamplePS, g_pBicubicHorizontalUpsamplePS);
-    CreatePSO(BicubicVerticalUpsamplePS, g_pBicubicVerticalUpsamplePS);
-    CreatePSO(SharpeningUpsamplePS, g_pSharpeningUpsamplePS);
+        CreatePSO(PresentSDRPS, g_pPresentSDRPS);
+        CreatePSO(MagnifyPixelsPS, g_pMagnifyPixelsPS);
+        CreatePSO(BilinearUpsamplePS, g_pBilinearUpsamplePS);
+        CreatePSO(BicubicHorizontalUpsamplePS, g_pBicubicHorizontalUpsamplePS);
+        CreatePSO(BicubicVerticalUpsamplePS, g_pBicubicVerticalUpsamplePS);
+        CreatePSO(SharpeningUpsamplePS, g_pSharpeningUpsamplePS);
 
-#undef CreatePSO
+    #undef CreatePSO
 
-    BicubicHorizontalUpsamplePS = s_BlendUIPSO;
-    BicubicHorizontalUpsamplePS.SetBlendState( BlendDisable );
-    BicubicHorizontalUpsamplePS.SetPixelShader(g_pBicubicHorizontalUpsamplePS, sizeof(g_pBicubicHorizontalUpsamplePS) );
-    BicubicHorizontalUpsamplePS.SetRenderTargetFormat(DXGI_FORMAT_R11G11B10_FLOAT, DXGI_FORMAT_UNKNOWN);
-    BicubicHorizontalUpsamplePS.Finalize();
+        BicubicHorizontalUpsamplePS = s_BlendUIPSO;
+        BicubicHorizontalUpsamplePS.SetBlendState( BlendDisable );
+        BicubicHorizontalUpsamplePS.SetPixelShader(g_pBicubicHorizontalUpsamplePS, sizeof(g_pBicubicHorizontalUpsamplePS) );
+        BicubicHorizontalUpsamplePS.SetRenderTargetFormat(DXGI_FORMAT_R11G11B10_FLOAT, DXGI_FORMAT_UNKNOWN);
+        BicubicHorizontalUpsamplePS.Finalize();
 
-    PresentHDRPS = PresentSDRPS;
-    PresentHDRPS.SetPixelShader(g_pPresentHDRPS, sizeof(g_pPresentHDRPS));
-    DXGI_FORMAT SwapChainFormats[2] = { DXGI_FORMAT_R10G10B10A2_UNORM, DXGI_FORMAT_R10G10B10A2_UNORM };
-    PresentHDRPS.SetRenderTargetFormats(2, SwapChainFormats, DXGI_FORMAT_UNKNOWN );
-    PresentHDRPS.Finalize();
+        PresentHDRPS = PresentSDRPS;
+        PresentHDRPS.SetPixelShader(g_pPresentHDRPS, sizeof(g_pPresentHDRPS));
+        DXGI_FORMAT SwapChainFormats[2] = { DXGI_FORMAT_R10G10B10A2_UNORM, DXGI_FORMAT_R10G10B10A2_UNORM };
+        PresentHDRPS.SetRenderTargetFormats(2, SwapChainFormats, DXGI_FORMAT_UNKNOWN );
+        PresentHDRPS.Finalize();
 
-    g_GenerateMipsRS.Reset(3, 1);
-    g_GenerateMipsRS[0].InitAsConstants(0, 4);
-    g_GenerateMipsRS[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
-    g_GenerateMipsRS[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 4);
-    g_GenerateMipsRS.InitStaticSampler(0, SamplerLinearClampDesc);
-    g_GenerateMipsRS.Finalize(L"Generate Mips");
+        g_GenerateMipsRS.Reset(3, 1);
+        g_GenerateMipsRS[0].InitAsConstants(0, 4);
+        g_GenerateMipsRS[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
+        g_GenerateMipsRS[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 4);
+        g_GenerateMipsRS.InitStaticSampler(0, SamplerLinearClampDesc);
+        g_GenerateMipsRS.Finalize(L"Generate Mips");
     
-#define CreatePSO(ObjName, ShaderByteCode ) \
-    ObjName.SetRootSignature(g_GenerateMipsRS); \
-    ObjName.SetComputeShader(ShaderByteCode, sizeof(ShaderByteCode) ); \
-    ObjName.Finalize();
+    #define CreatePSO(ObjName, ShaderByteCode ) \
+        ObjName.SetRootSignature(g_GenerateMipsRS); \
+        ObjName.SetComputeShader(ShaderByteCode, sizeof(ShaderByteCode) ); \
+        ObjName.Finalize();
 
-    CreatePSO(g_GenerateMipsLinearPSO[0], g_pGenerateMipsLinearCS);
-    CreatePSO(g_GenerateMipsLinearPSO[1], g_pGenerateMipsLinearOddXCS);
-    CreatePSO(g_GenerateMipsLinearPSO[2], g_pGenerateMipsLinearOddYCS);
-    CreatePSO(g_GenerateMipsLinearPSO[3], g_pGenerateMipsLinearOddCS);
-    CreatePSO(g_GenerateMipsGammaPSO[0], g_pGenerateMipsGammaCS);
-    CreatePSO(g_GenerateMipsGammaPSO[1], g_pGenerateMipsGammaOddXCS);
-    CreatePSO(g_GenerateMipsGammaPSO[2], g_pGenerateMipsGammaOddYCS);
-    CreatePSO(g_GenerateMipsGammaPSO[3], g_pGenerateMipsGammaOddCS);
+        CreatePSO(g_GenerateMipsLinearPSO[0], g_pGenerateMipsLinearCS);
+        CreatePSO(g_GenerateMipsLinearPSO[1], g_pGenerateMipsLinearOddXCS);
+        CreatePSO(g_GenerateMipsLinearPSO[2], g_pGenerateMipsLinearOddYCS);
+        CreatePSO(g_GenerateMipsLinearPSO[3], g_pGenerateMipsLinearOddCS);
+        CreatePSO(g_GenerateMipsGammaPSO[0], g_pGenerateMipsGammaCS);
+        CreatePSO(g_GenerateMipsGammaPSO[1], g_pGenerateMipsGammaOddXCS);
+        CreatePSO(g_GenerateMipsGammaPSO[2], g_pGenerateMipsGammaOddYCS);
+        CreatePSO(g_GenerateMipsGammaPSO[3], g_pGenerateMipsGammaOddCS);
 
-    g_PreDisplayBuffer.Create(L"PreDisplay Buffer", g_DisplayWidth, g_DisplayHeight, 1, SwapChainFormat);
+        g_PreDisplayBuffer.Create(L"PreDisplay Buffer", g_DisplayWidth, g_DisplayHeight, 1, SwapChainFormat);
+    }
 
     GpuTimeManager::Initialize(4096);
     SetNativeResolution();
-    TemporalEffects::Initialize();
-    PostEffects::Initialize();
-    SSAO::Initialize();
-    TextRenderer::Initialize();
-    GraphRenderer::Initialize();
-    ParticleEffects::Initialize(kMaxNativeWidth, kMaxNativeHeight);
+
+    if (!GameCore::g_computeOnly)
+    {
+        TemporalEffects::Initialize();
+        PostEffects::Initialize();
+        SSAO::Initialize();
+        TextRenderer::Initialize();
+        GraphRenderer::Initialize();
+        ParticleEffects::Initialize(kMaxNativeWidth, kMaxNativeHeight);
+    }
 }
 
 void Graphics::Terminate( void )
@@ -797,28 +805,31 @@ void Graphics::PreparePresentLDR(void)
 
 void Graphics::Present(void)
 {
-    if (g_bEnableHDROutput)
-        PreparePresentHDR();
-    else
-        PreparePresentLDR();
-
-    if (g_skipPresent <= 0)
+    if (!GameCore::g_computeOnly)
     {
-        g_CurrentBuffer = (g_CurrentBuffer + 1) % SWAP_CHAIN_BUFFER_COUNT;
+        if (g_bEnableHDROutput)
+            PreparePresentHDR();
+        else
+            PreparePresentLDR();
 
-        UINT PresentInterval = s_EnableVSync ? std::min(4, (int)Round(s_FrameTime * 60.0f)) : 0;
+        if (g_skipPresent <= 0)
+        {
+            g_CurrentBuffer = (g_CurrentBuffer + 1) % SWAP_CHAIN_BUFFER_COUNT;
 
-        s_SwapChain1->Present(PresentInterval, 0);
+            UINT PresentInterval = s_EnableVSync ? std::min(4, (int)Round(s_FrameTime * 60.0f)) : 0;
+
+            s_SwapChain1->Present(PresentInterval, 0);
+        }
+        else
+            --g_skipPresent;
+
+        // Test robustness to handle spikes in CPU time
+        //if (s_DropRandomFrames)
+        //{
+        //    if (std::rand() % 25 == 0)
+        //        BusyLoopSleep(0.010);
+        //}
     }
-    else
-        --g_skipPresent;
-
-    // Test robustness to handle spikes in CPU time
-    //if (s_DropRandomFrames)
-    //{
-    //    if (std::rand() % 25 == 0)
-    //        BusyLoopSleep(0.010);
-    //}
 
     int64_t CurrentTick = SystemTime::GetCurrentTick();
 
@@ -845,9 +856,12 @@ void Graphics::Present(void)
     s_FrameStartTick = CurrentTick;
 
     ++s_FrameIndex;
-    TemporalEffects::Update((uint32_t)s_FrameIndex);
+    if (!GameCore::g_computeOnly)
+    {
+        TemporalEffects::Update((uint32_t)s_FrameIndex);
 
-    SetNativeResolution();
+        SetNativeResolution();
+    }
 }
 
 uint64_t Graphics::GetFrameCount(void)

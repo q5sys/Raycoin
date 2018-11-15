@@ -40,11 +40,16 @@ public:
         Time timestamp;
     };
 
+    static RaycoinViewer inst;
+
     RaycoinViewer() {}
 
-    static void parseCommandLineArgs(const WCHAR* argv[], int argc);
-    static void start();
-
+    void parseCommandLineArgs(const WCHAR* argv[], int argc);
+    void start();
+#ifdef COMPUTE_ONLY
+    void update();
+    void terminate();
+#endif
     virtual void Startup() override;
     virtual void Cleanup() override;
 

@@ -264,6 +264,13 @@ byte* g_hitShaderTable = nullptr;
 UINT g_offsetToMaterialConstants;
 UINT g_shaderRecordSizeInBytes;
 
+namespace GameCore
+{
+    bool UpdateApplication(IGameApp& app);
+    void TerminateApplication(IGameApp& app);
+    extern bool g_computeOnly;
+}
+
 namespace Graphics
 {
     extern int g_gpuSelect;
@@ -309,6 +316,8 @@ bool comparei(wstring& str, wstring &str2)
         });
 }
 
+RaycoinViewer RaycoinViewer::inst;
+
 void RaycoinViewer::parseCommandLineArgs(const WCHAR* argv[] , int argc)
 {
     int consumed;
@@ -335,14 +344,14 @@ int wmain(int argc, const WCHAR* argv[])
     if (SHGetSpecialFolderPathW(nullptr, defaultPath, CSIDL_APPDATA, true))
         EngineTuning::g_settingsPath = wstring(defaultPath) + L"\\" + L"Raycoin";
 
-    RaycoinViewer::parseCommandLineArgs(argv, argc);
+    RaycoinViewer::inst.parseCommandLineArgs(argv, argc);
 
     WCHAR absPath[MAX_PATH] = L"";
     if (GetFullPathNameW(EngineTuning::g_settingsPath.c_str(), MAX_PATH, absPath, nullptr))
         EngineTuning::g_settingsPath = absPath;
     SHCreateDirectoryExW(nullptr, EngineTuning::g_settingsPath.c_str(), nullptr);
 
-    RaycoinViewer::start();
+    RaycoinViewer::inst.start();
     return 0;
 }
 
@@ -395,14 +404,29 @@ void RaycoinViewer::start()
     }
     */
 
-    s_EnableVSync = false;
     TargetResolution = kCustom;
     g_NativeWidthCustom = g_screenDim;
     g_NativeHeightCustom = g_screenDim;
     g_DisplayWidth = g_screenDim;
     g_DisplayHeight = g_screenDim;
-    GameCore::RunApplication(RaycoinViewer(), L"Raycoin Viewer " RAYCOIN_VERSION_STRING);
+    s_EnableVSync = false;
+#ifdef COMPUTE_ONLY
+    GameCore::g_computeOnly = true;
+#endif
+    GameCore::RunApplication(*this, L"Raycoin Viewer " RAYCOIN_VERSION_STRING);
 }
+
+#ifdef COMPUTE_ONLY
+void RaycoinViewer::update()
+{
+    GameCore::UpdateApplication(*this);
+}
+
+void RaycoinViewer::terminate()
+{
+    GameCore::TerminateApplication(*this);
+}
+#endif
 
 class DescriptorHeapStack
 {
@@ -481,11 +505,13 @@ unique_ptr<DescriptorHeapStack> g_pRaytracingDescriptorHeap;
 
 static void InitializeViews()
 {
+#ifndef COMPUTE_ONLY
     D3D12_CPU_DESCRIPTOR_HANDLE uavHandle;
     UINT uavDescriptorIndex;
     g_pRaytracingDescriptorHeap->AllocateDescriptor(uavHandle, uavDescriptorIndex);
     Graphics::g_Device->CopyDescriptorsSimple(1, uavHandle, g_SceneColorBuffer.GetUAV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     g_OutputUAV = g_pRaytracingDescriptorHeap->GetGpuHandle(uavDescriptorIndex);
+#endif
 }
 
 D3D12_STATE_SUBOBJECT CreateDxilLibrary(LPCWSTR entrypoint, const void *pShaderByteCode, SIZE_T bytecodeLength, D3D12_DXIL_LIBRARY_DESC &dxilLibDesc, D3D12_EXPORT_DESC &exportDesc)
@@ -575,7 +601,11 @@ void InitializeRaytracingStateObjects()
 
     // Hit Group shader stuff
     // ----------------------------------------------------------------//
+#ifndef COMPUTE_ONLY
     const int hitGroupCount = 2;
+#else
+    const int hitGroupCount = 1;
+#endif
     vector<LPCWSTR> hitGroupExportNames(hitGroupCount);
     vector<LPCWSTR> closestHitExportNames(hitGroupCount);
     vector<pair<const unsigned char*, SIZE_T>> hitShaders(hitGroupCount);
@@ -587,9 +617,11 @@ void InitializeRaytracingStateObjects()
     closestHitExportNames[0] = L"Hit";
     hitShaders[0] = make_pair(g_phitShader, sizeof(g_phitShader));
 
+#ifndef COMPUTE_ONLY
     hitGroupExportNames[1] = L"LineHitGroup";
     closestHitExportNames[1] = L"LineHit";
     hitShaders[1] = make_pair(g_plineHitShader, sizeof(g_plineHitShader));
+#endif
 
     for (int i = 0; i < hitGroupCount; ++i)
     {
@@ -613,7 +645,11 @@ void InitializeRaytracingStateObjects()
     D3D12_STATE_SUBOBJECT shaderConfigStateObject;
     D3D12_RAYTRACING_SHADER_CONFIG shaderConfig;
     shaderConfig.MaxAttributeSizeInBytes = 8;
-    shaderConfig.MaxPayloadSizeInBytes = 48;
+#ifndef COMPUTE_ONLY
+    shaderConfig.MaxPayloadSizeInBytes = 64;
+#else
+    shaderConfig.MaxPayloadSizeInBytes = 32;
+#endif
     shaderConfigStateObject.pDesc = &shaderConfig;
     shaderConfigStateObject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
     subObjects.push_back(shaderConfigStateObject);
@@ -642,10 +678,15 @@ void InitializeRaytracingStateObjects()
             byte *pShaderRecord = i * g_shaderRecordSizeInBytes + pShaderTable;
             memcpy(pShaderRecord, pHitGroupIdentifierData, shaderIdentifierSize);
             
+#ifndef COMPUTE_ONLY
             MaterialRootConstants material = {{1,1,1}, (UINT)i};
+#else
+            MaterialRootConstants material = {(UINT)i};
+#endif
             memcpy(pShaderRecord + g_offsetToMaterialConstants, &material, sizeof(material));
         }
 
+#ifndef COMPUTE_ONLY
         {
             int lineIdx = g_sphereCount;
             byte *pShaderRecord = lineIdx * g_shaderRecordSizeInBytes + pShaderTable;
@@ -654,6 +695,7 @@ void InitializeRaytracingStateObjects()
             MaterialRootConstants material = {{1,1,1}, (UINT)lineIdx};
             memcpy(pShaderRecord + g_offsetToMaterialConstants, &material, sizeof(material));
         }
+#endif
     };
 
     {
@@ -955,9 +997,10 @@ void RaycoinViewer::Startup( void )
     g_indexBuffer.Create(L"Index Buffer", (int)mesh.second.size(), sizeof(Triangle), mesh.second.data());
     g_attribBuffer.Create(L"Attributes Buffer", (int)attribs.size(), sizeof(Attrib), attribs.data());
 
+#ifndef COMPUTE_ONLY
     g_lineMesh = make_cylinder(1,1,1,g_lineMeshLOD);
     g_arrowHeadMesh = make_cylinder(1,1,0,g_lineMeshLOD);
-
+#endif
     g_hitShaderConstantBuffer.Create(L"Hit Constant Buffer", 1, sizeof(HitShaderConstants));
     g_initFieldConstantBuffer.Create(L"Init Field Constant Buffer", 1, sizeof(InitFieldConstants));
 
@@ -993,9 +1036,9 @@ void RaycoinViewer::Startup( void )
     s_cameraPresets[CAMERAPRESET_HIT] = s_cameraPresets[CAMERAPRESET_ORIGIN];
 
     _cameraController.reset(new CameraController(_camera, Vector3(kYUnitVector)));
-    #ifndef RELEASE
+#ifndef RELEASE
     _cameraController->SlowRotation(true);
-    #endif
+#endif
     _cameraPresetLast = -1;
     _cameraPresetSave = {};
 
@@ -1014,14 +1057,17 @@ void RaycoinViewer::Startup( void )
     _traceLogCurLast = 0;
     _revertBestHash = false;
     _resetAccelStruct = false;
-
+#ifndef COMPUTE_ONLY
     EngineTuning::StartLoad(nullptr);
+#endif
     _cameraHitLast = g_cameraHitCur;
     _vsyncSave = s_EnableVSync;
 
+#ifndef COMPUTE_ONLY
     loadTraceLog();
     g_traceLogCur = (int)_traceLog.size();
     if (!g_traceLogCur) g_mode = MODE_COMPUTE;
+#endif
 }
 
 void RaycoinViewer::buildAccelStruct()
@@ -1029,7 +1075,11 @@ void RaycoinViewer::buildAccelStruct()
     g_pRaytracingDescriptorHeap->reset();
     InitializeViews();
 
+#ifndef COMPUTE_ONLY
     bool hasLine = g_lineIndexBuffer.GetGpuVirtualAddress();
+#else
+    bool hasLine = false;
+#endif
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo;
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelAccelDesc = {};
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS &topLevelInputs = topLevelAccelDesc.Inputs;
@@ -1058,16 +1108,19 @@ void RaycoinViewer::buildAccelStruct()
     geometryDescs[0].Triangles.VertexBuffer.StartAddress = g_vertexBuffer.GetGpuVirtualAddress();
     geometryDescs[0].Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
 
-    geometryDescs[1].Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-    geometryDescs[1].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-    geometryDescs[1].Triangles.IndexBuffer = g_lineIndexBuffer.GetGpuVirtualAddress();
-    geometryDescs[1].Triangles.IndexCount = g_lineIndexBuffer.GetGpuVirtualAddress() ? (UINT)g_lineIndexBuffer->GetDesc().Width / sizeof(Index) : 0;
-    geometryDescs[1].Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
-    geometryDescs[1].Triangles.Transform3x4 = 0;
-    geometryDescs[1].Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-    geometryDescs[1].Triangles.VertexCount = g_lineVertexBuffer.GetGpuVirtualAddress() ? (UINT)g_lineVertexBuffer->GetDesc().Width / sizeof(Vertex) : 0;
-    geometryDescs[1].Triangles.VertexBuffer.StartAddress = g_lineVertexBuffer.GetGpuVirtualAddress();
-    geometryDescs[1].Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
+    if (hasLine)
+    {
+        geometryDescs[1].Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+        geometryDescs[1].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+        geometryDescs[1].Triangles.IndexBuffer = g_lineIndexBuffer.GetGpuVirtualAddress();
+        geometryDescs[1].Triangles.IndexCount = g_lineIndexBuffer.GetGpuVirtualAddress() ? (UINT)g_lineIndexBuffer->GetDesc().Width / sizeof(Index) : 0;
+        geometryDescs[1].Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
+        geometryDescs[1].Triangles.Transform3x4 = 0;
+        geometryDescs[1].Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+        geometryDescs[1].Triangles.VertexCount = g_lineVertexBuffer.GetGpuVirtualAddress() ? (UINT)g_lineVertexBuffer->GetDesc().Width / sizeof(Vertex) : 0;
+        geometryDescs[1].Triangles.VertexBuffer.StartAddress = g_lineVertexBuffer.GetGpuVirtualAddress();
+        geometryDescs[1].Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
+    }
 
     const int numBottomLevels = 1+hasLine;
     vector<UINT64> bottomLevelAccelSize(numBottomLevels);
@@ -1178,6 +1231,7 @@ void HandleDigitalButtonPress(GameInput::DigitalInput button, float timeDelta, f
 
 void RaycoinViewer::Update(float deltaT)
 {
+#ifndef COMPUTE_ONLY
     ScopedTimer _prof(L"Update State");
 
     if (GameInput::IsFirstPressed(GameInput::kKey_1) ||
@@ -1369,14 +1423,14 @@ void RaycoinViewer::Update(float deltaT)
         if (g_mode == MODE_COMPUTE) for (auto& e : _seed) e = (rand() << 16) | rand();
         for (int i = 0; i < _target.size(); ++i) _target[i] = ~(INT64(~0) << max(32 - max((int)g_difficulty - 32*i, 0), 0));
     }
-
+#endif
     const int framesAvgCount = 20;
     static float frameRates[framesAvgCount] = {};
     frameRates[Graphics::GetFrameCount() % framesAvgCount] = Graphics::GetFrameRate();
     float frameRateAvg = 0.0;
     for (auto frameRate : frameRates) frameRateAvg += frameRate / framesAvgCount;
     _tracePerSec = g_screenDim*g_screenDim*frameRateAvg;
-
+#ifndef COMPUTE_ONLY
     EngineProfiling::DrawFrameRate = (bool)g_showInfo;
     _traceLogStatusTime = max(_traceLogStatusTime - min(deltaT, 1.f), 0.f);
     
@@ -1385,6 +1439,7 @@ void RaycoinViewer::Update(float deltaT)
     TextRenderer::g_hiColor = {g_textHiColor_r, g_textHiColor_g, g_textHiColor_b, g_textHiColor_a};
 
     g_time = fmod(g_time+deltaT, 10000.f);
+#endif
 }
 
 void RaycoinViewer::setCameraPreset(const CameraPreset& cameraPreset)

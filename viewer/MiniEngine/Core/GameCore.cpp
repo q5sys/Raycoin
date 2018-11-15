@@ -46,67 +46,75 @@ namespace GameCore
     const bool TestGenerateMips = false;
     bool g_computeOnly = false;
 
-    void InitializeApplication( IGameApp& game )
+    void InitializeApplication( IGameApp& app )
     {
         Graphics::Initialize();
         SystemTime::Initialize();
         GameInput::Initialize();
         EngineTuning::Initialize();
 
-        game.Startup();
+        app.Startup();
     }
 
-    void TerminateApplication( IGameApp& game )
+    void TerminateApplication( IGameApp& app )
     {
-        game.Cleanup();
+        Graphics::Terminate();
+        app.Cleanup();
 
         GameInput::Shutdown();
+        Graphics::Shutdown();
     }
 
-    bool UpdateApplication( IGameApp& game )
+    bool UpdateApplication( IGameApp& app )
     {
-        EngineProfiling::Update();
+        if (!g_computeOnly) EngineProfiling::Update();
 
         float DeltaTime = Graphics::GetFrameTime();
     
-        GameInput::Update(DeltaTime);
-        EngineTuning::Update(DeltaTime);
-        
-        game.Update(DeltaTime);
-        game.RenderScene();
-
-        PostEffects::Render();
-
-        if (TestGenerateMips)
+        if (!g_computeOnly)
         {
-            GraphicsContext& MipsContext = GraphicsContext::Begin();
-
-            // Exclude from timings this copy necessary to setup the test
-            MipsContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_GENERIC_READ);
-            MipsContext.TransitionResource(g_GenMipsBuffer, D3D12_RESOURCE_STATE_COPY_DEST);
-            MipsContext.CopySubresource(g_GenMipsBuffer, 0, g_SceneColorBuffer, 0);
-
-            EngineProfiling::BeginBlock(L"GenerateMipMaps()", &MipsContext);
-            g_GenMipsBuffer.GenerateMipMaps(MipsContext);
-            EngineProfiling::EndBlock(&MipsContext);
-
-            MipsContext.Finish();
+            GameInput::Update(DeltaTime);
+            EngineTuning::Update(DeltaTime);
         }
 
-        GraphicsContext& UiContext = GraphicsContext::Begin(L"Render UI");
-        UiContext.TransitionResource(g_OverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-        UiContext.ClearColor(g_OverlayBuffer);
-        UiContext.SetRenderTarget(g_OverlayBuffer.GetRTV());
-        UiContext.SetViewportAndScissor(0, 0, g_OverlayBuffer.GetWidth(), g_OverlayBuffer.GetHeight());
-        game.RenderUI(UiContext);
+        app.Update(DeltaTime);
+        app.RenderScene();
 
-        EngineTuning::Display( UiContext, 0.0f, 40.0f, 1900.0f, 1040.0f );
+        if (!g_computeOnly)
+        {
+            PostEffects::Render();
 
-        UiContext.Finish();
+            if (TestGenerateMips)
+            {
+                GraphicsContext& MipsContext = GraphicsContext::Begin();
+
+                // Exclude from timings this copy necessary to setup the test
+                MipsContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_GENERIC_READ);
+                MipsContext.TransitionResource(g_GenMipsBuffer, D3D12_RESOURCE_STATE_COPY_DEST);
+                MipsContext.CopySubresource(g_GenMipsBuffer, 0, g_SceneColorBuffer, 0);
+
+                EngineProfiling::BeginBlock(L"GenerateMipMaps()", &MipsContext);
+                g_GenMipsBuffer.GenerateMipMaps(MipsContext);
+                EngineProfiling::EndBlock(&MipsContext);
+
+                MipsContext.Finish();
+            }
+
+            GraphicsContext& UiContext = GraphicsContext::Begin(L"Render UI");
+            UiContext.TransitionResource(g_OverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+            UiContext.ClearColor(g_OverlayBuffer);
+            UiContext.SetRenderTarget(g_OverlayBuffer.GetRTV());
+            UiContext.SetViewportAndScissor(0, 0, g_OverlayBuffer.GetWidth(), g_OverlayBuffer.GetHeight());
+            app.RenderUI(UiContext);
+
+            EngineTuning::Display( UiContext, 0.0f, 40.0f, 1900.0f, 1040.0f );
+
+            UiContext.Finish();
+        }
 
         Graphics::Present();
 
-        return !game.IsDone();
+        return !app.IsDone();
     }
 
     // Default implementation to be overridden by the application
@@ -342,6 +350,7 @@ namespace GameCore
         ASSERT(g_hWnd != 0);
 
         InitializeApplication(app);
+        if (g_computeOnly) return;
 
         if (g_Device)
         {
@@ -360,9 +369,7 @@ namespace GameCore
             while (UpdateApplication(app));    // Returns false to quit loop
         }
 
-        Graphics::Terminate();
         TerminateApplication(app);
-        Graphics::Shutdown();
     }
 
     //--------------------------------------------------------------------------------------

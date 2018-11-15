@@ -65,8 +65,7 @@ static bool AppInit(int argc, char* argv[])
 
     bool fRet = false;
 
-    GameCore::g_computeOnly = true;
-    RaycoinViewer::start();
+    RaycoinViewer::inst.start(true);
 
     //
     // Parameters
@@ -176,8 +175,8 @@ static bool AppInit(int argc, char* argv[])
 
         using Args = const WCHAR*[];
         auto wstring = [](std::string& s){ return std::wstring(s.begin(), s.end()); };
-        RaycoinViewer::parseCommandLineArgs(Args{L"", L"-gpu", wstring(gArgs.GetArg("-gpu", "0")).c_str()}, 3);
-        RaycoinViewer::parseCommandLineArgs(Args{L"", L"-datadir", GetDataDir(false).c_str()}, 3);
+        RaycoinViewer::inst.parseCommandLineArgs(Args{L"", L"-gpu", wstring(gArgs.GetArg("-gpu", "0")).c_str()}, 3);
+        RaycoinViewer::inst.parseCommandLineArgs(Args{L"", L"-datadir", GetDataDir(false).c_str()}, 3);
     }
     catch (const std::exception& e) {
         PrintExceptionContinue(&e, "AppInit()");
@@ -191,6 +190,7 @@ static bool AppInit(int argc, char* argv[])
     } else {
         WaitForShutdown();
     }
+    RaycoinViewer::inst.terminate();
     Shutdown(interfaces);
 
     return fRet;

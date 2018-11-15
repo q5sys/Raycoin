@@ -9,8 +9,10 @@ struct RayPayload
     bool reflection;
     float rayT;
     int prim;
+#ifndef COMPUTE_ONLY
     float3 diffuseColor;
     float3 emissiveColor;
+#endif
     uint label;
     int instId;
 };
@@ -83,9 +85,16 @@ float3 lighting(
 static const float2x2 g_rot_sqrt2deg = {0.999695398, -0.0246801768,
                                         0.0246801768, 0.999695398};
 
-float3 trace(RayPayload initPayload)
+#ifndef COMPUTE_ONLY
+float3
+#else
+void
+#endif
+trace(RayPayload initPayload)
 {
+#ifndef COMPUTE_ONLY
     PathElem_ path[g_pathMax];
+#endif
     blake2s_state hash_s;
     blake2s_init(hash_s);
     blake2s_in hash_in;
@@ -94,7 +103,11 @@ float3 trace(RayPayload initPayload)
     float depthSqrMax = 0;
     float3 pos = WorldRayOrigin();
     float3 dir = WorldRayDirection();
+#ifndef COMPUTE_ONLY
     int pathMax = g.compute ? g_pathMax : g.shadePathMax;
+#else
+    int pathMax = g_pathMax;
+#endif
     int p;
     for (p = 0; p < pathMax && hit < g_hitCount; ++p)
     {
@@ -102,18 +115,23 @@ float3 trace(RayPayload initPayload)
         if (p)
         {
             RayDesc rayDesc = {pos, 0, dir, FLT_MAX};
-            payload.reflection = true;                             //don't show lines through a miss
+            payload.reflection = true;                             
+#ifndef COMPUTE_ONLY                                                //don't show lines through a miss
             TraceRay(g_accel, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, !miss ? ~0 : ~(-g_instLine), 0, 1, 0, rayDesc, payload);
+#else
+            TraceRay(g_accel, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, rayDesc, payload);
+#endif
         }
         else
             payload = initPayload;
+#ifndef COMPUTE_ONLY
         path[p].pos = pos;
         path[p].dir = dir;
         path[p].instId = payload.instId;
         path[p].diffuseColor = payload.diffuseColor;
         path[p].emissiveColor = payload.emissiveColor;
-
         bool endTrace = false;
+#endif
         switch (payload.instId)
         {
         case g_instMiss:
@@ -126,28 +144,37 @@ float3 trace(RayPayload initPayload)
             dir.xz = mul(g_rot_sqrt2deg, dir.xz);
             break;
         }
+#ifndef COMPUTE_ONLY
         case g_instLine:
         {
             endTrace = true;
             break;
         }
+#endif
         default:
         {
+            float3 norm = g_attrib[payload.prim].norm;
+#ifndef COMPUTE_ONLY
             path[p].rayT = payload.rayT;
-            path[p].norm = g_attrib[payload.prim].norm;
+            path[p].norm = norm;
+#endif
             hash_in[hit>>2][hit&3] = payload.label;
             ++hit;
 
             pos += dir * payload.rayT;
-            dir = reflect(dir, path[p].norm);
+            dir = reflect(dir, norm);
             depthSqrMax = max(dot(pos,pos), depthSqrMax);
             break;
         }
         }
+#ifndef COMPUTE_ONLY
         if (endTrace) { ++p; break; }
+#endif
     }
 
+#ifndef COMPUTE_ONLY
     if (g.compute && g.hashing)
+#endif
     {
         if (hit == g_hitCount && depthSqrMax >= g_targetDepthSqr)
         {
@@ -172,6 +199,7 @@ float3 trace(RayPayload initPayload)
                     g_traceResult[1].pos = g.verifyPos.x < 0 ? DispatchRaysIndex().xy : g.verifyPos;
                     g_traceResult[1].depth = sqrt(depthSqrMax);
                     g_traceResult[1].hash = hash_s.h;
+#ifndef COMPUTE_ONLY
                     g_traceResult[1].pathCount = p;
                     for (int i = 0; i < p; ++i)
                     {
@@ -180,6 +208,7 @@ float3 trace(RayPayload initPayload)
                         g_traceResult[1].path[i].rayT = path[i].rayT;
                         g_traceResult[1].path[i].instId = path[i].instId;
                     }
+#endif
                 }
             }
             else if (g.bestHash)
@@ -212,6 +241,7 @@ float3 trace(RayPayload initPayload)
                     g_traceResult[0].pos = g.verifyPos.x < 0 ? DispatchRaysIndex().xy : g.verifyPos;
                     g_traceResult[0].depth = sqrt(depthSqrMax);
                     g_traceResult[0].hash = hash_s.h;
+#ifndef COMPUTE_ONLY
                     g_traceResult[0].pathCount = p;
                     for (i = 0; i < p; ++i)
                     {
@@ -220,6 +250,7 @@ float3 trace(RayPayload initPayload)
                         g_traceResult[0].path[i].rayT = path[i].rayT;
                         g_traceResult[0].path[i].instId = path[i].instId;
                     }
+#endif
                     g_traceResult[0].success = false;
                     DeviceMemoryBarrier();
                     break;
@@ -228,6 +259,7 @@ float3 trace(RayPayload initPayload)
         }
     }
 
+#ifndef COMPUTE_ONLY
     int last = min(p, g.shadePathMax)-1;
     float3 outputColor = {0,0,0};
     for (int i = last; i >= 0; --i)
@@ -256,4 +288,5 @@ float3 trace(RayPayload initPayload)
         }
     }
     return outputColor;
+#endif
 }

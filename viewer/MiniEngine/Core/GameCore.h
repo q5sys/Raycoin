@@ -41,8 +41,6 @@ namespace GameCore
     };
 
     void RunApplication( IGameApp& app, const wchar_t* className );
-
-    extern bool g_computeOnly;
 }
 
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
