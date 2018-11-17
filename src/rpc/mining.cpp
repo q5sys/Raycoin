@@ -179,12 +179,12 @@ UniValue generateBlocks(std::shared_ptr<CReserveScript> coinbaseScript, int nGen
             std::stringstream s;
             s << "Mining... ";
             s << "RT/s: " << std::fixed << std::setw(5) << std::setprecision(2) << RaycoinViewer::inst.tracePerSec() / 1000000.f << "M";
-            
+
             auto target = ArithToUint256(arith_uint256().SetCompact(block.nBits)).GetHex();
             if (target.find_last_not_of('0') != std::string::npos) target.erase(target.find_last_not_of('0')+1);
-            s << ", Target: 0x" << target << "...";
-            
             s << ", Best: 0x" << toUint256(res.hash).GetHex().substr(0, target.length()) << "...";
+            s << ", Target: 0x" << target << "...";
+
             LogPrintf("%s\n", s.str().c_str());
             statusIntervalStart = GetTime();
         }
