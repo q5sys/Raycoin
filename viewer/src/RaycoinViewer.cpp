@@ -1393,12 +1393,23 @@ void RaycoinViewer::Update(float deltaT)
         for (int i = 0; i < _target.size(); ++i) _target[i] = ~(INT64(~0) << max(32 - max((int)g_difficulty - 32*i, 0), 0));
     }
 #endif
-    const int framesAvgCount = 20;
-    static float frameRates[framesAvgCount] = {};
-    frameRates[Graphics::GetFrameCount() % framesAvgCount] = Graphics::GetFrameRate();
-    float frameRateAvg = 0.0;
-    for (auto frameRate : frameRates) frameRateAvg += frameRate / framesAvgCount;
+
+    //only update a single bucket per frame but average over a larger history
+    const int framesAvgDim = 10;
+    static float frameRates[framesAvgDim][framesAvgDim] = {};
+    static float frameRateTotals[framesAvgDim] = {};
+
+    int bucket = Graphics::GetFrameCount() % framesAvgDim;
+    frameRates[bucket][(Graphics::GetFrameCount()/framesAvgDim) % framesAvgDim] = Graphics::GetFrameRate();
+    frameRateTotals[bucket] = 0;
+    for (auto f : frameRates[bucket]) frameRateTotals[bucket] += f;
+    
+    float frameRateAvg = 0;
+    for (auto f : frameRateTotals) frameRateAvg += f;
+    frameRateAvg /= framesAvgDim*framesAvgDim;
+    
     _tracePerSec = g_screenDim*g_screenDim*frameRateAvg;
+
 #ifndef COMPUTE_ONLY
     EngineProfiling::DrawFrameRate = (bool)g_showInfo;
     _traceLogStatusTime = max(_traceLogStatusTime - min(deltaT, 1.f), 0.f);
@@ -1599,6 +1610,9 @@ void RaycoinViewer::RenderScene(void)
             if (traceResult.success || g_traceLogCur || memcmp(traceResult.hash, _result.hash.data(), sizeof(_result.hash)))
             {
                 _result.success = traceResult.success;
+                _result.blockHeight = _blockHeight;
+                _result.blockNonce = _blockNonce;
+                _result.blockExtraNonce = _blockExtraNonce;
                 _result.seed = _seed;
                 _result.target = _target;
                 memcpy(_result.hash.data(), traceResult.hash, sizeof(_result.hash));
@@ -1620,9 +1634,8 @@ void RaycoinViewer::RenderScene(void)
         }
         else
             context.Finish();
-#ifndef COMPUTE_ONLY
+
         if (_verifyPos.x >= 0) Graphics::g_skipPresent = 1;
-#endif
     }
 }
 

@@ -12,8 +12,8 @@
 #include "Camera.h"
 #include "univalue.h"
 
-#define RAYCOIN_VERSION_MAJOR 0
-#define RAYCOIN_VERSION_MINOR 5
+#define RAYCOIN_VERSION_MAJOR 1
+#define RAYCOIN_VERSION_MINOR 0
 
 #define RAYCOIN_TOSTR2(s) #s
 #define RAYCOIN_TOSTR(s) RAYCOIN_TOSTR2(s)

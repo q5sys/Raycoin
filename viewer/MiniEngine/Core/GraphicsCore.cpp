@@ -823,8 +823,6 @@ void Graphics::Present(void)
 
             s_SwapChain1->Present(PresentInterval, 0);
         }
-        else
-            --g_skipPresent;
 
         // Test robustness to handle spikes in CPU time
         //if (s_DropRandomFrames)
@@ -856,9 +854,14 @@ void Graphics::Present(void)
         s_FrameTime = (float)SystemTime::TimeBetweenTicks(s_FrameStartTick, CurrentTick);
     }
 
-    s_FrameStartTick = CurrentTick;
+    if (g_skipPresent > 0)
+        --g_skipPresent;
+    else
+    {
+        s_FrameStartTick = CurrentTick;
+        ++s_FrameIndex;
+    }
 
-    ++s_FrameIndex;
     if (!GameCore::g_computeOnly)
     {
         TemporalEffects::Update((uint32_t)s_FrameIndex);
