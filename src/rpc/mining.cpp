@@ -344,8 +344,8 @@ static UniValue generate(const JSONRPCRequest& request)
             "    (ie. custom mining can't begin until a new valid block has been received)\n"
             "  - the previous block hash in 'blockdata' must be among the blocks connected from the network in this session\n"
             "If 'blockdata' is specified and any of these constraints are not met then this call will return immediately with an error.\n"
-            "Note that for the first 4 years the network will reject any block with a coinbase that omits the founders reward:\n"
-            "3HwpSFbMb9P1eKFiE2SnSbbYpXS5mj22e6, 4.95 raycoins\n"
+            "Note that for the first 4 years the network will reject any block with a coinbase that omits\n"
+            "the founders reward: 3HwpSFbMb9P1eKFiE2SnSbbYpXS5mj22e6, 4.95 raycoins\n"
             "\nExamples:\n\n"
             "Generate 11 blocks to myaddress\n"
             + HelpExampleCli("generate", "\"myaddress\" 11")
